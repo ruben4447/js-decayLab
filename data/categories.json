@@ -1,0 +1,12 @@
+{
+  "actinide": [195, 255, 235],
+  "alkali metal": [255, 195, 195],
+  "alkaline earth metal": [211, 211, 255],
+  "diatomic nonmetal": [254, 255, 186],
+  "lanthanide": [174, 255, 255],
+  "metalloid": [224, 237, 186],
+  "noble gas": [255, 228, 186],
+  "polyatomic nonmetal": [235, 235, 167],
+  "post-transition metal": [186, 255, 186],
+  "transition metal": [188, 222, 255]
+}

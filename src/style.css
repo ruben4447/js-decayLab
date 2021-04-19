@@ -1,0 +1,157 @@
+body {
+  font-family: Arial, Helvetica, sans-serif
+}
+
+canvas {
+  border: 1px solid black;
+}
+
+.heading {
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.popup-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(51, 51, 51, 0.5);
+}
+
+.popup-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  /* z-index: 100; */
+}
+
+.popup-body {
+  border: 1px solid black;
+  padding: 4px;
+  border-radius: 2px;
+  background: seashell;
+  text-align: center;
+}
+
+table.bordered,
+table.bordered tr,
+table.bordered th,
+table.bordered td {
+  border: 1px solid #000;
+  border-collapse: collapse;
+}
+
+.indented-container {
+  margin-left: 15px;
+  padding-left: 5px;
+  border-left: 1px solid #2b2a2a;
+}
+
+.centred {
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.scroll-window {
+  overflow-y: scroll;
+  max-height: 70vh;
+}
+
+.decay-chain {
+  text-align: left;
+}
+
+.link {
+  text-decoration: underline;
+  color: mediumblue;
+}
+
+.link:hover {
+  text-decoration: none;
+  cursor: pointer;
+  color: red;
+}
+
+.element-plaque {
+  padding: 6px;
+  border: 1px solid #000;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.display-children-block>* {
+  display: block;
+}
+
+.element-plaque>.element-plaque-symbol {
+  font-size: 1.6em;
+  font-weight: bolder;
+}
+
+.element-plaque>.element-plaque-category {
+  font-size: .9em;
+  font-style: italic;
+}
+
+.ptable-element-plaque {
+  border-radius: 1px;
+  transform: scale(1);
+  transition: .2s transform;
+}
+
+.ptable-element-plaque:hover {
+  cursor: pointer;
+  transform: scale(1.3);
+}
+
+
+[data-category="actinide"] {
+  background-color: rgb(195, 255, 235)
+}
+
+[data-category="alkali metal"] {
+  background-color: rgb(255, 195, 195)
+}
+
+[data-category="alkaline earth metal"] {
+  background-color: rgb(211, 211, 255)
+}
+
+[data-category="diatomic nonmetal"] {
+  background-color: rgb(254, 255, 186)
+}
+
+[data-category="lanthanide"] {
+  background-color: rgb(174, 255, 255)
+}
+
+[data-category="metalloid"] {
+  background-color: rgb(224, 237, 186)
+}
+
+[data-category="noble gas"] {
+  background-color: rgb(255, 228, 186)
+}
+
+[data-category="polyatomic nonmetal"] {
+  background-color: rgb(235, 235, 167)
+}
+
+[data-category="post-transition metal"] {
+  background-color: rgb(186, 255, 186)
+}
+
+[data-category="transition metal"] {
+  background-color: rgb(188, 222, 255)
+}
+
+.legend-colour {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 1px solid black;
+}

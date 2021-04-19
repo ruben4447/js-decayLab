@@ -1,0 +1,11 @@
+{
+  Z                   // Proton number
+  N                   // Neutron number
+  mass                // Isotopic Mass
+  halflife            // Halflife
+  stable
+  decay: [
+    [$daughter_isotope, $decay_mode, $percentage]
+  ]
+  abundance
+}
