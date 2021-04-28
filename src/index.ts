@@ -12,10 +12,6 @@ globalThis.mgr = undefined;
 
 async function main() {
   wrapper = document.getElementById('wrapper');
-  canvas = document.createElement('canvas');
-  canvas.width = 1000;
-  canvas.height = 650;
-  wrapper.appendChild(canvas);
 
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -36,11 +32,13 @@ async function main() {
     console.log(`[${time} s] ${arrFromBack(atom.getHistory(), 2)} -> (${info.mode}) -> ${atom.getIsotopeSymbol()}`);
   });
 
-  const manager = new SampleManager(canvas);
+  const manager = new SampleManager(wrapper);
+  manager.width = 800;
+  manager.height = 600;
   globals.manager = manager;
   manager.setSample(sample);
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
-  manager.sampleConfig.legend = LegendOptionValues.Radioactive;
+  manager.sampleConfig.legend = LegendOptionValues.Elements;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();

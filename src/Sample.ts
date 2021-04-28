@@ -1,18 +1,16 @@
 import Atom, { IDecayInfo } from './Atom';
-import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString, rgbStringify } from './utils';
+import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString } from './utils';
 import SampleManager from './SampleManager';
 import DecayAnimation from './DecayAnimation';
-
-const BG_COLOUR = rgbStringify([191]);
 
 type AtomDecayCallback = (atom: Atom, info: IDecayInfo, time: number) => void;
 
 export class Sample {
   private _animations: DecayAnimation[] = [];
   private _atoms: Atom[] = [];
-  private _time: number = 0;
-  private _incTimeAmount: number = 1;
-  private _loopIntervalID: number = NaN;
+  private _time = 0;
+  private _incTimeAmount = 1;
+  private _loopIntervalID = NaN;
 
   private _callbackAtomDecay: AtomDecayCallback;
 
@@ -23,13 +21,8 @@ export class Sample {
   }
 
   getAtomCount() { return this._atoms.length; }
-
+  
   render(manager: SampleManager) {
-    const ctx = manager.ctx, canvas = manager.canvas;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = BG_COLOUR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     this._atoms.forEach(atom => atom.render(manager));
     for (let i = this._animations.length - 1; i >= 0; i--) {
       const a = this._animations[i];

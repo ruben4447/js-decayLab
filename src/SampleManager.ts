@@ -1,11 +1,14 @@
 import type Sample from './Sample';
-import { createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, removeChildren, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
+import { bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
-import { generateAtomInfo, generateDecayHistory, generateElementInfo, generateFullLegend, generatePeriodicTable } from './generate-info';
+import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateElementInfo, generateFullLegend, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
+import Piechart from './Piechart';
+import globals from './globals';
 
 export default class SampleManager {
   private _sample: Sample;
+  private _wrapper: HTMLElement;
   private _canvas: HTMLCanvasElement;
   private _ctx: CanvasRenderingContext2D;
   private _rendering: boolean = false;
@@ -15,13 +18,20 @@ export default class SampleManager {
   private _optionsPopup: Popup; // Popup for options. Initialised in this.initOptionsPopup()
   private _legendContainer: HTMLElement; // Container for sample legend
   private _legendData: { [item: string]: ILegendItem } = {}; // Data for legend
+  private _chart: Piechart; // For containing chart in rendering
+  private _chartLabelOver: string; // Label of section we are over
+  public renderMode: RenderMode = RenderMode.Atoms;
   public readonly sampleConfig = createSampleConfigObject();
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(wrapper: HTMLElement) {
     this._sample = undefined;
-    this._canvas = canvas;
-    this._ctx = canvas.getContext('2d');
+    this._wrapper = wrapper;
+    this._canvas = document.createElement("canvas");
+    this._wrapper.appendChild(this._canvas);
+    this._ctx = this._canvas.getContext('2d');
     this._removeEventsFn = this._addEvents();
+    this._chart = new Piechart(this._canvas);
+    this._chart.setPos(this._canvas.width / 2, this._canvas.height / 2);
   }
 
   destroy() {
@@ -29,9 +39,9 @@ export default class SampleManager {
   }
 
   get width() { return this._canvas.width; }
-  set width(w: number) { this._canvas.width = w; }
+  set width(w: number) { this._canvas.width = w; this._chart.setPos(w / 2, this._chart.getPos()[1]); }
   get height() { return this._canvas.height; }
-  set height(h: number) { this._canvas.height = h; }
+  set height(h: number) { this._canvas.height = h; this._chart.setPos(this._chart.getPos()[0], h / 2); }
   get ctx() { return this._ctx; }
   get canvas() { return this._canvas; }
 
@@ -56,7 +66,43 @@ export default class SampleManager {
   }
 
   _render() {
-    if (this._sample && typeof this._sample.render == 'function') this._sample.render(this);
+    if (this.renderMode == RenderMode.Piechart) {
+      this.clearCanvasBG();
+      this._chart.reset();
+      for (let key in this._legendData) {
+        if (this._legendData.hasOwnProperty(key)) {
+          this._chart.setData(key, this._legendData[key].count, this._legendData[key].rgb);
+        }
+      }
+      this._chart.render(this._chartLabelOver);
+
+      if (this._chartLabelOver !== undefined) {
+        const label = this._chartLabelOver, xpad = 5, ypad = 5, ldata = this._chart.getData(label);
+        if (ldata) {
+          this._ctx.font = '13px sans-serif';
+          let percent = (ldata.count / this._chart.getTotal()) * 100;
+          const text = `${label} - ${round(percent, 2)}%`;
+
+          const obj = this._ctx.measureText(text);
+          const twidth = obj.width, theight = obj.actualBoundingBoxAscent + obj.actualBoundingBoxDescent;
+
+          let ypos = this._canvas.height - theight - 2 * ypad;
+          this._ctx.beginPath();
+          this._ctx.fillStyle = bestColour(ldata.rgb);
+          this._ctx.rect(0, ypos, twidth + 2 * xpad, theight + 2 * ypad);
+          this._ctx.fill();
+          
+          this._ctx.fillStyle = ldata.colour;
+          this._ctx.textAlign = 'left';
+          this._ctx.textBaseline = 'top';
+          this._ctx.fillText(text, xpad, ypos + ypad);
+        }
+      }
+    } else {
+      this.clearCanvasBG();
+      this._sample.render(this);
+    }
+    
     if (this._rendering) globalThis.requestAnimationFrame(this._render.bind(this));
 
     let currentTime = this._sample.getTime();
@@ -65,6 +111,12 @@ export default class SampleManager {
       this._simulationTime.innerText = `${numberWithCommas(time)} ${unit}`;
       this._lastTime = currentTime;
     }
+  }
+
+  private clearCanvasBG() {
+    this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    this._ctx.fillStyle = "rgb(141, 141, 141)";
+    this._ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
   }
 
   /** Add atom to sample, in a random position */
@@ -93,54 +145,81 @@ export default class SampleManager {
 
 
     const onMouseMove = (event: MouseEvent) => {
-      if (Popup.popupsOpen() === 0 && self.sampleConfig.interactiveAtoms) {
-        mouseCoords = extractCoords(event);
-        if (self._sample) {
-          const atom = self._sample.getAtomOver(mouseCoords[0], mouseCoords[1]);
-          setAtomOver(atom);
+      if (Popup.popupsOpen() === 0 && self.sampleConfig.interactive) {
+        /// RenderMode=Atoms
+        if (self.renderMode == RenderMode.Atoms) {
+          mouseCoords = extractCoords(event);
+          if (self._sample) {
+            const atom = self._sample.getAtomOver(mouseCoords[0], mouseCoords[1]);
+            setAtomOver(atom);
+          }
+        } else if (self.renderMode == RenderMode.Piechart) {
+          mouseCoords = extractCoords(event);
+          this._chartLabelOver = undefined;
+          if (this._chart.isOver(mouseCoords)) {
+            for (let label of this._chart.getLabels()) {
+              if (this._chart.isOverLabel(label, mouseCoords)) {
+                this._chartLabelOver = label;
+                break;
+              }
+            }
+          }
         }
       }
     };
     this._canvas.addEventListener('mousemove', onMouseMove);
 
     const onClick = (event: MouseEvent) => {
-      if (Popup.popupsOpen() !== 0 || !self.sampleConfig.interactiveAtoms) return;
+      if (Popup.popupsOpen() !== 0 || !self.sampleConfig.interactive) return;
 
-      if (_atomOver !== null) {
-        const { title, body } = generateAtomInfo(_atomOver);
-        let popup = new Popup(title);
-        popup.insertAdjacentElement("beforeend", body);
-        popup.show();
+      /// RenderMode=Atoms
+      if (self.renderMode === RenderMode.Atoms) {
+        if (_atomOver != null) {
+          const { title, body } = generateAtomInfo(_atomOver);
+          let popup = new Popup(title);
+          popup.insertAdjacentElement("beforeend", body);
+          popup.show();
+        }
+      } else if (self.renderMode === RenderMode.Piechart) {
+        if (self._chartLabelOver !== undefined) {
+          clickLegendLink(self.sampleConfig.legend, self._chartLabelOver);
+        }
       }
     };
     this._canvas.addEventListener('click', onClick);
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (Popup.popupsOpen() === 0 && self.sampleConfig.interactiveAtoms && _atomOver) {
-        if (event.key == 'd') {
-          /// FORCE DECAY
-          self._sample.atomDecay(_atomOver, true);
-        } else if (event.key == 'l') {
-          /// DEBUG: LOG INFO
-          console.log(_atomOver);
-        } else if (event.key == 'Delete') {
-          if (!this._sample.isSimulationRunning()) {
-            /// DELETE (prompt)
-            let symbol = _atomOver.getIsotopeSymbol();
-            let link = createLink(`Remove isotope ${symbol} from sample`);
-            link.addEventListener('click', () => {
-              this._sample.removeAtom(_atomOver);
-              setAtomOver(null);
-              popup.hide();
-            });
-            let popup = new Popup(`Remove ${symbol}?`);
-            popup.insertAdjacentElement('beforeend', link);
-            popup.show();
+      if (Popup.popupsOpen() === 0 && self.sampleConfig.interactive) {
+        /// RenderMode=Atoms
+        if (self.renderMode == RenderMode.Atoms) {
+          if (_atomOver != null) {
+            /// RenderMode=Atoms
+            if (event.key == 'd') {
+              /// FORCE DECAY
+              self._sample.atomDecay(_atomOver, true);
+            } else if (event.key == 'l') {
+              /// DEBUG: LOG INFO
+              console.log(_atomOver);
+            } else if (event.key == 'Delete') {
+              if (!this._sample.isSimulationRunning()) {
+                /// DELETE (prompt)
+                let symbol = _atomOver.getIsotopeSymbol();
+                let link = createLink(`Remove isotope ${symbol} from sample`);
+                link.addEventListener('click', () => {
+                  this._sample.removeAtom(_atomOver);
+                  setAtomOver(null);
+                  popup.hide();
+                });
+                let popup = new Popup(`Remove ${symbol}?`);
+                popup.insertAdjacentElement('beforeend', link);
+                popup.show();
+              }
+            } else if (event.key == 'h') {
+              /// DECAY HISTORY
+              const { title, body } = generateDecayHistory(_atomOver.getHistory());
+              new Popup(title).insertAdjacentElement('beforeend', body).show();
+            }
           }
-        } else if (event.key == 'h') {
-          /// DECAY HISTORY
-          const { title, body } = generateDecayHistory(_atomOver.getHistory());
-          new Popup(title).insertAdjacentElement('beforeend', body).show();
         }
       }
     };
@@ -160,8 +239,35 @@ export default class SampleManager {
     body.style.textAlign = 'left';
     this._optionsPopup.insertAdjacentElement('beforeend', body);
 
+    /// Render Mode
+    body.insertAdjacentHTML('beforeend', '<span class="heading">Rendering</span><br>');
+    body.insertAdjacentHTML('beforeend', '<span>Mode</span>: ');
+    let selectRenderMode = document.createElement('select');
+    for (let mode in RenderMode) {
+      if (isNaN(+mode)) {
+        let option = document.createElement('option');
+        if (this.renderMode as unknown as string == RenderMode[mode]) option.setAttribute('selected', 'selected');
+        option.innerText = mode;
+        option.value = RenderMode[mode];
+        selectRenderMode.appendChild(option);
+      }
+    }
+    body.insertAdjacentElement('beforeend', selectRenderMode);
+    selectRenderMode.addEventListener('change', () => {
+      this.renderMode = parseInt(selectRenderMode.value);
+    });
+
+    body.insertAdjacentHTML('beforeend', '<br><abbr title="Interactive canvas">Interactive</abbr>: ');
+    let checkboxInteractive = document.createElement('input');
+    checkboxInteractive.type = 'checkbox';
+    checkboxInteractive.checked = this.sampleConfig.interactive;
+    checkboxInteractive.addEventListener('change', () => {
+      this.sampleConfig.interactive = checkboxInteractive.checked;
+    });
+    body.appendChild(checkboxInteractive);
+
     /// Atom
-    body.insertAdjacentHTML('beforeend', '<span class="heading">Atoms</span><br>');
+    body.insertAdjacentHTML('beforeend', '<hr><span class="heading">Atoms</span><br>');
     body.insertAdjacentHTML('beforeend', '<abbr title="Show isotope text, radioactive symbol and size depending upon isotopic mass">Pretty</abbr>: ');
     let checkboxPrettyStyle = document.createElement('input');
     checkboxPrettyStyle.type = 'checkbox';
@@ -189,15 +295,6 @@ export default class SampleManager {
       }
     })
     body.appendChild(inputAtomRadius);
-
-    body.insertAdjacentHTML('beforeend', '<br><abbr title="Click on atoms, keyboard events over atoms, ...">Interactive</abbr>: ');
-    let checkboxInteractiveAtoms = document.createElement('input');
-    checkboxInteractiveAtoms.type = 'checkbox';
-    checkboxInteractiveAtoms.checked = this.sampleConfig.interactiveAtoms;
-    checkboxInteractiveAtoms.addEventListener('change', () => {
-      this.sampleConfig.interactiveAtoms = checkboxInteractiveAtoms.checked;
-    });
-    body.appendChild(checkboxInteractiveAtoms);
 
     /// Legend
     body.insertAdjacentHTML('beforeend', '<hr> <span class="heading">Legend</span><br>');
@@ -353,8 +450,13 @@ export default class SampleManager {
       let string = this.getLegendString(atom);
 
       if (!this._legendData.hasOwnProperty(string)) {
-        const [r, g, b] = randomHSBColour();
-        this._legendData[string] = { colour: `rgb(${r}, ${g}, ${b})`, percent: -1, count: 0 };
+        let rgb: number[];
+        if (this.sampleConfig.legend === LegendOptionValues.Radioactive) {
+          rgb = string == 'Radioactive' ? [0, 255, 229] : [255, 162, 0];
+        } else {
+          rgb = randomHSBColour();
+        }
+        this._legendData[string] = { rgb, colour: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`, percent: -1, count: 0 };
       }
       if (!atom.isStable()) radioactiveCount++;
       this._legendData[string].count++;
@@ -372,7 +474,7 @@ export default class SampleManager {
 
     const body = this._legendContainer;
     body.innerHTML = '';
-    // Radioactive?
+    // Radioactive ratio?
     let radioactivePercent = (radioactiveCount / totalAtoms) * 100;
     body.insertAdjacentHTML('beforeend', `<span>${totalAtoms} atoms &rarr; ${numberWithCommas(radioactiveCount)} ${RADIOACTIVE_SYMBOL} : ${numberWithCommas(totalAtoms - radioactiveCount)}  (<span title='${radioactivePercent}%'>${round(radioactivePercent, 3)}% ${RADIOACTIVE_SYMBOL}</span>)</span><br>`);
 
@@ -404,7 +506,7 @@ export const atomGetStringDependingOnLegend = (atom: Atom, legend: LegendOptionV
 export interface ISampleConfig {
   prettyStyle: boolean; // Show atoms with text, varying size from mass?
   atomRadius: number; // If !prettyStyle, what is the radius of each atom?
-  interactiveAtoms: boolean; // Interactive Atoms?
+  interactive: boolean; // Is the canvas interactive?
   legend: LegendOptionValues; // Legend to display
   legendLength: number; // Number of items in legend
 }
@@ -418,6 +520,7 @@ export enum LegendOptionValues {
 
 export interface ILegendItem {
   colour: string;
+  rgb: number[];
   count: number; // Number of items
   percent: number; // Percentage of sample
 }
@@ -426,8 +529,14 @@ export function createSampleConfigObject(): ISampleConfig {
   return {
     prettyStyle: true,
     atomRadius: 20,
-    interactiveAtoms: true,
+    interactive: true,
     legend: LegendOptionValues.None,
     legendLength: 7,
   };
 }
+
+export enum RenderMode {
+  Atoms,
+  Piechart,
+}
+globalThis.RenderMode = RenderMode;

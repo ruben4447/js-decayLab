@@ -323,6 +323,22 @@ export function generatePTablePlaque(atomic_number: number): HTMLDivElement {
   return div;
 }
 
+export function clickLegendLink(legend: LegendOptionValues, string: string) {
+  let title, body;
+  if (legend == LegendOptionValues.Isotopes) {
+    let obj = generateAtomInfo(Atom.fromIsotopeString(string))
+    title = obj.title;
+    body = obj.body;
+  } else if (legend == LegendOptionValues.Elements) {
+    let obj = generateElementInfo(string);
+    title = obj.title;
+    body = obj.body;
+  } else {
+    return;
+  }
+  new Popup(title).insertAdjacentElement('beforeend', body).show();
+}
+
 /**
  * 
  * @param total Total number of things which { .count } properties should add to
@@ -346,22 +362,6 @@ export function generateFullLegend(total: number, legendData: { [item: string]: 
   }
   div.insertAdjacentHTML('beforeend', ` <em>Total: ${total}</em> &nbsp;`);
 
-  function clickLink(string: string) {
-    let title, body;
-    if (globals.manager.sampleConfig.legend == LegendOptionValues.Isotopes) {
-      let obj = generateAtomInfo(Atom.fromIsotopeString(string))
-      title = obj.title;
-      body = obj.body;
-    } else if (globals.manager.sampleConfig.legend == LegendOptionValues.Elements) {
-      let obj = generateElementInfo(string);
-      title = obj.title;
-      body = obj.body;
-    } else {
-      return;
-    }
-    new Popup(title).insertAdjacentElement('beforeend', body).show();
-  }
-
   let n = 0, entries = Object.entries(legendData);
   for (let entry of entries) {
     if (n >= showLimit) break;
@@ -372,7 +372,7 @@ export function generateFullLegend(total: number, legendData: { [item: string]: 
     span.insertAdjacentHTML('beforeend', `<span class='legend-colour' style='background-color:${data.colour}'></span> `);
 
     let spanLabel = createLink(entry[0]);
-    spanLabel.addEventListener('click', () => clickLink(entry[0]));
+    spanLabel.addEventListener('click', () => clickLegendLink(globals.manager.sampleConfig.legend, entry[0]));
     span.appendChild(spanLabel);
     span.insertAdjacentHTML('beforeend', ` <small title='${data.count} / ${total} atoms, ${percent}%'>(${percentString})</small>`);
     div.insertAdjacentText('beforeend', ' | ');

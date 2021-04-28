@@ -241,3 +241,32 @@ export function sortObjectByProperty(object: object, property: string, ascending
 export function arrFromBack<T>(array: T[], n: number): T {
   return array[array.length - n];
 }
+
+
+export const rotateCoords = (cx: number, cy: number, r: number, theta: number): [number, number] => ([cx + r * Math.cos(theta), cy + r * Math.sin(theta)]);
+
+/** Used by isInsideSector */
+function areClockwise(center: number[], radius: number, angle: number, point: number[]) {
+  var point1 = [
+    (center[0] + radius) * Math.cos(angle),
+    (center[1] + radius) * Math.sin(angle)
+  ];
+  return -point1[0] * point[1] + point1[1] * point[0] > 0;
+}
+
+/** Is a point inside a sector of a circle? */
+export function isInsideSector(point: number[], center: number[], radius: number, angle1: number, angle2: number) {
+  var relPoint = [
+    point[0] - center[0],
+    point[1] - center[1]
+  ];
+
+  if (angle2 - angle1 < Math.PI) {
+    return !areClockwise(center, radius, angle1, relPoint) &&
+      areClockwise(center, radius, angle2, relPoint) &&
+      (relPoint[0] * relPoint[0] + relPoint[1] * relPoint[1] <= radius * radius);
+  } else {
+    const half = (angle1 + angle2) / 2;
+    return isInsideSector(point, center, radius, angle1, angle2 - half) || isInsideSector(point, center, radius, angle1 + half, angle2);
+  }
+}

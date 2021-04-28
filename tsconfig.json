@@ -3,5 +3,8 @@
     "lib": ["ES2017", "DOM"],
     "downlevelIteration": true,
     "target": "ES6"
-  }
+  },
+  "bundleDependancies": [
+    "chart.js"
+  ],
 }
