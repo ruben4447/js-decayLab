@@ -1,8 +1,11 @@
-import Atom, { IDecayInfo } from "./Atom";
+import Atom from "./Atom";
+import { IDecayInfo } from "./InterfaceEnum";
 import SampleManager from "./SampleManager";
 import { getSuitableFontSize, TWO_PI } from "./utils";
 
 export default class DecayAnimation {
+  public static readonly colourSwapEvery = 5; // Swap colpur every ___ frames
+
   public static totalFrames = 20;
   private _done: boolean = false;
   private _frame: number = 0;
@@ -39,7 +42,7 @@ export default class DecayAnimation {
     ctx.beginPath();
     if (this._colourStage == 0) ctx.fillStyle = `rgba(255, 128, 0, ${opacity})`;
     else if (this._colourStage == 1) ctx.fillStyle = `rgba(250, 0, 0, ${opacity})`;
-    if (this._frame % 5 === 0) this._colourStage ^= 1;
+    if (this._frame % DecayAnimation.colourSwapEvery === 0) this._colourStage ^= 1;
 
     const radius = this.getRadius();
     ctx.arc(this.x, this.y, radius, 0, TWO_PI);

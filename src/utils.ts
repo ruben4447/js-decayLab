@@ -1,5 +1,6 @@
-import { DecayModes, IDecayInfo, IIsotopeInfo } from "./Atom";
+import { DecayModes } from "./Atom";
 import elementData from "../data/elements.json";
+import { IDecayInfo, IIsotopeInfo, ITimeObject } from "./InterfaceEnum";
 
 export function rgbStringify(array: number[]) {
   if (array.length === 1) return `rgb(${array[0]}, ${array[0]}, ${array[0]})`;
@@ -89,11 +90,6 @@ export const secondsToAppropriateTime = (s: number): ITimeObject => {
 
   return { unit: appropriate_unit, time: approproate_time, };
 };
-
-interface ITimeObject {
-  unit: string;
-  time: number;
-}
 
 export const createLink = (html?: string) => {
   const link = document.createElement("span");

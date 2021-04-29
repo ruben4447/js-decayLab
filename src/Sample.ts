@@ -1,7 +1,8 @@
-import Atom, { IDecayInfo } from './Atom';
+import Atom from './Atom';
 import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString } from './utils';
 import SampleManager from './SampleManager';
 import DecayAnimation from './DecayAnimation';
+import { IDecayInfo } from './InterfaceEnum';
 
 type AtomDecayCallback = (atom: Atom, info: IDecayInfo, time: number) => void;
 

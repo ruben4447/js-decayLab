@@ -1,10 +1,10 @@
-import Atom, { IDecayInfo } from './Atom';
+import Atom from './Atom';
 import Popup from './Popup';
 import { numberWithCommas, secondsToAppropriateTime, createLink, capitaliseString, nicifyNull, RADIOACTIVE_SYMBOL, decayModeToString, getIsotopeDecayInfo, round } from './utils';
 import elementData from '../data/elements.json';
 import ptableData from '../data/ptable.json';
 import globals from './globals';
-import { ILegendItem, LegendOptionValues } from './SampleManager';
+import { IDecayInfo, IGeneratedInfo, ILegendItem, LegendOptionValues } from './InterfaceEnum';
 
 export function generateAtomInfo(atom: Atom): IGeneratedInfo {
   const table = document.createElement("table"), isStable = atom.isStable(), body = document.createElement("div");
@@ -228,7 +228,8 @@ export function generateElementInfo(name: string): IGeneratedInfo {
   if (data) {
     let plaque = generateElementPlaque(name);
     body.appendChild(plaque);
-    body.insertAdjacentHTML('beforeend', '<hr>');
+    const wikipediaLink = 'https://en.wikipedia.org/wiki/' + data.name;
+    body.insertAdjacentHTML('beforeend', `<a href='${wikipediaLink}' target='_blank'>Wikipedia Link</a><hr>`);
 
     let table = document.createElement("table");
     let tbody = document.createElement("tbody");
@@ -248,7 +249,6 @@ export function generateElementInfo(name: string): IGeneratedInfo {
       let units = data.phase == 'Gase' ? 'g/l' : 'g/cm³';
       tbody.insertAdjacentHTML('beforeend', `<tr><th>Density</th><td>${data.density} ${units}</td></tr>`);
     }
-    tbody.insertAdjacentHTML('beforeend', `<tr><th>Discovered By</th><td>${nicifyNull(data.discovered_by)}</td></tr>`);
 
     let tr = document.createElement("tr");
     tbody.appendChild(tr);
@@ -323,20 +323,58 @@ export function generatePTablePlaque(atomic_number: number): HTMLDivElement {
   return div;
 }
 
+/** Click on legend link; Return: was a popup opened? */
 export function clickLegendLink(legend: LegendOptionValues, string: string) {
-  let title, body;
-  if (legend == LegendOptionValues.Isotopes) {
-    let obj = generateAtomInfo(Atom.fromIsotopeString(string))
-    title = obj.title;
-    body = obj.body;
-  } else if (legend == LegendOptionValues.Elements) {
-    let obj = generateElementInfo(string);
-    title = obj.title;
-    body = obj.body;
-  } else {
-    return;
+  let info: IGeneratedInfo;
+  switch (legend) {
+    case LegendOptionValues.Isotopes:
+      info = generateAtomInfo(Atom.fromIsotopeString(string))
+      break;
+    case LegendOptionValues.Elements:
+      info = generateElementInfo(string);
+      break;
+    case LegendOptionValues.Radioactive:
+    case LegendOptionValues.Decayed:
+    case LegendOptionValues.DecayedTimes: {
+      let atoms: string[] = [], title = string + ' Isotopes';
+      if (legend === LegendOptionValues.DecayedTimes) title = `Decayed ${string} Times`;
+      globals.sample.forEachAtom(atom => globals.manager.getLegendString(atom, legend) === string && atoms.push(atom.getIsotopeSymbol()));
+      info = generateIsotopeInfoList(title, atoms);
+      break;
+    }
+    default:
+      console.log(`click legend link '${legend}' string '${string}' -- no action`);
   }
-  new Popup(title).insertAdjacentElement('beforeend', body).show();
+
+  if (info) {
+    info.body.classList.add('from-legend-link');
+    new Popup(info.title).insertAdjacentElement('beforeend', info.body).show();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+/** Take array, and transform into HTML list */
+export function generateIsotopeInfoList(title: string, isotopes: string[]): IGeneratedInfo {
+  const body = document.createElement("div");
+  body.classList.add('scroll-window');
+  body.classList.add('generated-list');
+  const listEl = document.createElement("ul");
+  body.appendChild(listEl);
+
+  for (const isotope of isotopes) {
+    let itemEl = document.createElement("li");
+    let link = createLink(isotope);
+    link.addEventListener('click', () => {
+      const { title, body } = generateAtomInfo(Atom.fromIsotopeString(isotope));
+      new Popup(title).insertAdjacentElement('beforeend', body).show();
+    });
+    itemEl.appendChild(link);
+    listEl.appendChild(itemEl);
+  }
+
+  return { title, body };
 }
 
 /**
@@ -397,9 +435,4 @@ export function generateFullLegend(total: number, legendData: { [item: string]: 
   }
 
   return div;
-}
-
-interface IGeneratedInfo {
-  title: string;
-  body: HTMLDivElement;
 }

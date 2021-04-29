@@ -50,10 +50,13 @@ export default class Popup {
 
   show() {
     if (!this.isOpen()) {
+      // Create backdrop
       this._popupBg = document.createElement("div");
       this._popupBg.classList.add("popup-bg");
+      this._popupBg.addEventListener('click', () => this.hide());
       document.body.insertAdjacentElement('beforeend', this._popupBg);
 
+      // Create popups
       let container = document.createElement('div');
       container.classList.add("popup-container");
       this._popupDiv = container;

@@ -1,37 +1,29 @@
+import { IPiechartDataItem } from "./InterfaceEnum";
 import { bestColour, isInsideSector, rotateCoords } from "./utils";
-
-export interface IDataItem {
-    count: number;
-    colour: string; // RGB string
-    rgb: number[]; // RGB colours
-    angleStart?: number;
-    angleEnd?: number;
-}
 
 export default class Piechart {
     private _canvas: HTMLCanvasElement;
     private _ctx: CanvasRenderingContext2D;
-    private _x = 0;
-    private _y = 0;
-    private _width: number;
-    private _data: { [label: string]: IDataItem } = {};
+    public x = 0;
+    public y = 0;
+    private _radius: number = 50;
+    private _data: { [label: string]: IPiechartDataItem } = {};
     private _total = 0;
 
     constructor(canvas: HTMLCanvasElement) {
         this._canvas = canvas;
         this._ctx = canvas.getContext("2d");
-        this._width = canvas.width;
     }
 
-    get width() { return this._width; }
-    set width(value: number) { this._width = value; }
+    get radius() { return this._radius; }
+    set radius(r: number) { this._radius = Math.abs(r); }
 
     setPos(x: number, y: number) {
-        this._x = x;
-        this._y = y;
+        this.x = x;
+        this.y = y;
     }
 
-    getPos() { return [this._x, this._y]; }
+    getPos() { return [this.x, this.y]; }
 
     hasData(label: string) {
         return this._data.hasOwnProperty(label);
@@ -68,10 +60,8 @@ export default class Piechart {
 
     getLabels() { return Object.keys(this._data); }
 
-    getRadius() { return this._width / 2; }
-
     render(labelHighlighted?: string) {
-        let cangle = 0, ctx = this._ctx, radius = this.getRadius();
+        let cangle = 0, ctx = this._ctx;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '10px sans-serif';
@@ -83,11 +73,11 @@ export default class Piechart {
 
                 ctx.beginPath();
                 ctx.fillStyle = this._data[label].colour;
-                ctx.moveTo(this._x, this._y);
-                ctx.lineTo(...rotateCoords(this._x, this._y, radius, cangle));
-                ctx.arc(this._x, this._y, radius, cangle, cangle + angle);
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(...rotateCoords(this.x, this.y, this.radius, cangle));
+                ctx.arc(this.x, this.y, this.radius, cangle, cangle + angle);
                 // ctx.lineTo(...rotateCoords(this._x, this._y, radius, cangle + angle));
-                ctx.lineTo(this._x, this._y);
+                ctx.lineTo(this.x, this.y);
                 ctx.fill();
                 if (labelHighlighted === label) {
                     ctx.strokeStyle = 'black';
@@ -100,7 +90,7 @@ export default class Piechart {
                 if (decimal > 0.03) {
                     ctx.beginPath();
                     ctx.fillStyle = bestColour(this._data[label].rgb, true);
-                    ctx.fillText(label, ...rotateCoords(this._x, this._y, radius / 2, cangle + angle / 2));
+                    ctx.fillText(label, ...rotateCoords(this.x, this.y, this.radius / 2, cangle + angle / 2));
                 }
 
                 cangle += angle;
@@ -109,15 +99,15 @@ export default class Piechart {
     }
 
     isOver(position: number[]) {
-        const r = this.getRadius();
-        if (position[0] < this._x - r || position[0] > this._x + r || position[1] < this._y - r || position[1] > this._y + r) return false;
+        const r = this.radius;
+        if (position[0] < this.x - r || position[0] > this.x + r || position[1] < this.y - r || position[1] > this.y + r) return false;
         return true;
     }
 
     isOverLabel(label: string, position: number[]) {
         if (this._data.hasOwnProperty(label)) {
             const data = this._data[label];
-            return isInsideSector(position, [this._x, this._y], this.getRadius(), data.angleStart, data.angleEnd);
+            return isInsideSector(position, this.getPos(), this.radius, data.angleStart, data.angleEnd);
         } else {
             return false;
         }

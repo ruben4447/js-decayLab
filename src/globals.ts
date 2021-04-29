@@ -10,7 +10,7 @@ export interface IGlobals {
 export const globals: IGlobals = {
   manager: undefined,
   sample: undefined,
-  ver: 0.1,
+  ver: 0.16,
 };
 globalThis.globals = globals;
 export default globals;

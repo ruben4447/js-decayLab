@@ -1,7 +1,8 @@
 import elementData from '../data/elements.json';
 import categoryColours from '../data/categories.json';
-import SampleManager, { atomGetStringDependingOnLegend, LegendOptionValues } from './SampleManager';
+import SampleManager from './SampleManager';
 import { rgbStringify, TWO_PI, randomChoice, RADIOACTIVE_SYMBOL, getSuitableFontSize, getNeutronsProtonsFromIsotopeString, probability } from './utils';
+import { IDecayInfo, LegendOptionValues } from './InterfaceEnum';
 
 globalThis.elementData = elementData;
 const HIGHLIGHT_COLOUR = rgbStringify([255, 50, 250]);
@@ -198,6 +199,11 @@ export default class Atom {
   getHistory() { return [...this._history]; }
   resetHistory() { this._history = [this.getIsotopeSymbol()]; }
 
+  /** Has this atom decayed? */
+  hasDecayed() {
+    return this._history.length > 1; // > 1 as history[] contains all past identities, including original
+  }
+
   /** Return duplicate of self */
   clone() { return Atom.fromIsotopeString(this._isotope); }
 
@@ -206,17 +212,6 @@ export default class Atom {
     let [protons, neutrons] = getNeutronsProtonsFromIsotopeString(string);
     return new Atom(protons, neutrons);
   }
-}
-
-export interface IDecayInfo {
-  daughter?: string;
-  mode?: string;
-  percentage?: number;
-}
-
-export interface IIsotopeInfo {
-  name: string; // Name of element
-  mass: number; // Mass of isotope
 }
 
 export const DecayModes = {
