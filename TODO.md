@@ -12,6 +12,7 @@
     - "Stable" and "radioactive" : list isotopes [DONE]
     - "Decayed", "Not Decayed" and decayed no. : list isotopes [DONE]
 
-- "Main" isotope of atoms to highlight
+- "Main" isotope of atoms to highlight [IN PROGRESS]
+    - See test/
 
 - Halflife estimator of current sample

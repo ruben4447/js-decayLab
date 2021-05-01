@@ -30,6 +30,8 @@ function test(data) {
         }
         testingIsotope.innerText = '-';
     }
+
+    save('unknown-isotopes.json', unknownIsotopesArr);
 }
 
 function _test(isotope, level = 0) {
@@ -62,4 +64,15 @@ function getIsotopeData(str) {
     } else {
         return undefined;
     }
+}
+
+function save(file, data) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '../webbots/save.php', true);
+  xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+  xhr.onload = function () {
+    // do something to response
+    console.log(this.responseText);
+  };
+  xhr.send(`file=../test/${file}&data=${encodeURIComponent(JSON.stringify(data))}`);
 }
