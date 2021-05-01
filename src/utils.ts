@@ -1,6 +1,6 @@
 import { DecayModes } from "./Atom";
 import elementData from "../data/elements.json";
-import { IDecayInfo, IIsotopeInfo, ITimeObject } from "./InterfaceEnum";
+import { IAnalysisResult, IDecayInfo, IIsotopeInfo, ITimeObject } from "./InterfaceEnum";
 
 export function rgbStringify(array: number[]) {
   if (array.length === 1) return `rgb(${array[0]}, ${array[0]}, ${array[0]})`;
@@ -180,6 +180,39 @@ export function removeChildren(el: HTMLElement) {
     el.firstElementChild.remove();
   }
 }
+
+export function analyseString(str: string): IAnalysisResult | null {
+  const obj: IAnalysisResult = { protons: NaN, neutrons: NaN, name: undefined, symbol: undefined, isotope: null }, lstr = str.toLowerCase();
+  if (elementData.order.indexOf(lstr) !== -1) {
+    obj.name = elementData[lstr].name;
+    obj.protons = elementData[lstr].number;
+    obj.neutrons = Math.round(elementData[lstr].atomic_mass);
+    obj.symbol = elementData[lstr].symbol;
+  } else {
+    let [symbol, mass] = str.split('-');
+    if (elementData.symbol_map.hasOwnProperty(symbol)) {
+      let element = elementData.symbol_map[symbol];
+      obj.name = elementData[element].name;
+      obj.symbol = elementData[element].symbol;
+      obj.protons = elementData[element].number;
+      obj.neutrons = Math.round(elementData[element].atomic_mass);
+
+      obj.isotope = { symbol: `${symbol}-${mass}`, parent: undefined, isomerNumber: NaN };
+      if (mass.indexOf('m') === -1) {
+        obj.isotope.parent = obj.isotope.symbol;
+      } else {
+        let [rmass, num] = mass.split('m');
+        if (num.length === 0) num = '1';
+        obj.isotope.isomerNumber = parseInt(num);
+        obj.isotope.parent = `${symbol}-${rmass}`;
+      }
+    } else {
+      return null;
+    }
+  }
+  return obj;
+}
+globalThis.analyseString = analyseString;
 
 export function hslToRgb(h: number, s: number, l: number) {
   // Must be fractions of 1

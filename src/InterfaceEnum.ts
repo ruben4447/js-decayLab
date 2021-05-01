@@ -77,3 +77,17 @@ export interface ITimeObject {
     unit: string;
     time: number;
 }
+
+export interface IAnalysisResult {
+    name: string; // Element name
+    symbol: string; // Element symbol
+    protons: number;
+    neutrons: number;
+    isotope: IIsotopeAnalysisResult | null;
+}
+
+export interface IIsotopeAnalysisResult {
+    symbol: string;
+    parent: string; // Same as 'symbol' unless is isomer
+    isomerNumber: number; // Number after 'm' e.g. 'In-119m2'. Default is NaN.
+}

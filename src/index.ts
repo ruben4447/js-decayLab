@@ -37,8 +37,7 @@ async function main() {
   globals.manager = manager;
   manager.setSample(sample);
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
-  manager.sampleConfig.legend = LegendOptionValues.DecayedTimes;
-  manager.sampleConfig.renderMode = RenderMode.Piechart;
+  manager.sampleConfig.legend = LegendOptionValues.Radioactive;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();

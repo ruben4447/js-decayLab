@@ -57,6 +57,10 @@ export class Sample {
     return arrayRemove(this._atoms, atom);
   }
 
+  removeAllAtoms() {
+    this._atoms.length = 0;
+  }
+
   /** Set callback for when atom decays */
   onAtomDecay(callback: AtomDecayCallback) {
     this._callbackAtomDecay = callback;

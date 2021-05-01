@@ -480,6 +480,15 @@ export default class SampleManager {
       this.updateLegend();
     });
     fieldset.appendChild(btnReset);
+
+    let btnClear = document.createElement('button');
+    btnClear.innerText = 'Clear';
+    btnClear.addEventListener('click', () => {
+      this._sample.resetSimulation();
+      this._sample.removeAllAtoms();
+      this.updateLegend();
+    });
+    fieldset.appendChild(btnClear);
   }
 
   /** Setup legend inside element */
