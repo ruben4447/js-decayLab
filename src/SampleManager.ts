@@ -1,10 +1,11 @@
 import type Sample from './Sample';
 import { bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
-import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateElementInfo, generateFullLegend, generatePeriodicTable } from './generate-info';
+import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateElementInfo, generateForceDecayInterface, generateFullLegend, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
 import Piechart from './Piechart';
 import { createSampleConfigObject, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
+import globals from './globals';
 
 export default class SampleManager {
   private _sample: Sample;
@@ -102,7 +103,7 @@ export default class SampleManager {
           this._ctx.fillStyle = bestColour(ldata.rgb);
           this._ctx.rect(0, ypos, twidth + 2 * xpad, theight + 2 * ypad);
           this._ctx.fill();
-          
+
           this._ctx.fillStyle = ldata.colour;
           this._ctx.textAlign = 'left';
           this._ctx.textBaseline = 'top';
@@ -113,7 +114,7 @@ export default class SampleManager {
       this.clearCanvasBG();
       this._sample.render(this);
     }
-    
+
     if (this._rendering) globalThis.requestAnimationFrame(this._render.bind(this));
 
     let currentTime = this._sample.getTime();
@@ -137,7 +138,7 @@ export default class SampleManager {
     if (this._sample.isSimulationRunning()) {
       return false;
     } else {
-      const pad = 10;
+      const pad = atom.getRadius();
       const x = randomInt(pad, this.width - pad), y = randomInt(pad, this.height - pad);
       atom.pos(x, y);
       this._sample.addAtom(atom);
@@ -188,7 +189,7 @@ export default class SampleManager {
       /// RenderMode=Atoms
       if (self.sampleConfig.renderMode === RenderMode.Atoms) {
         if (_atomOver != null) {
-          const { title, body } = generateAtomInfo(_atomOver);
+          const { title, body } = generateAtomInfo(_atomOver.getIsotopeSymbol());
           let popup = new Popup(title);
           popup.insertAdjacentElement("beforeend", body);
           popup.show();
@@ -207,10 +208,7 @@ export default class SampleManager {
         if (self.sampleConfig.renderMode == RenderMode.Atoms) {
           if (_atomOver != null) {
             /// RenderMode=Atoms
-            if (event.key == 'd') {
-              /// FORCE DECAY
-              self._sample.atomDecay(_atomOver, true);
-            } else if (event.key == 'l') {
+            if (event.key == 'l') {
               /// DEBUG: LOG INFO
               console.log(_atomOver);
             } else if (event.key == 'Delete') {
@@ -231,6 +229,20 @@ export default class SampleManager {
               /// DECAY HISTORY
               const { title, body } = generateDecayHistory(_atomOver.getHistory());
               new Popup(title).insertAdjacentElement('beforeend', body).show();
+            } else if (this.sampleConfig.manualOverride) {
+              // More options for manual Override
+              if (event.key == 'd') {
+                /// FORCE DECAY (naturally)
+                self._sample.atomDecay(_atomOver, true);
+              } else if (event.key == '#') {
+                // Assign to global variable
+                console.log(`Set globals.atom = #<Atom:${_atomOver.getIsotopeSymbol()}>`);
+                globals.atom = _atomOver;
+              } else if (event.key == 'D') {
+                /// FORCE DECAY (interface)
+                const { title, body } = generateForceDecayInterface(mode => console.log(mode));
+                new Popup(title).insertAdjacentElement('beforeend', body).show();
+              }
             }
           }
         }
@@ -383,6 +395,32 @@ export default class SampleManager {
       }
     });
     body.appendChild(inputLegendLength);
+
+    // Manual Override
+    body.insertAdjacentHTML('beforeend', '<hr> <span class="heading">Manual Override</span><br>');
+    let checkboxManualOverride = document.createElement('input');
+    checkboxManualOverride.type = "checkbox";
+    checkboxManualOverride.checked = this.sampleConfig.manualOverride;
+    checkboxManualOverride.addEventListener('change', () => {
+      if (checkboxManualOverride.checked) {
+        checkboxManualOverride.checked = false; // Turn off for now...
+        let content = document.createElement('div');
+        content.classList.add('manual-override-confirm');
+        content.insertAdjacentHTML('beforeend', `<p>Enable manual override? This option will allow impossible actions to be executed.<br><em>Note: Simulation will obey standard rules.</em></p>`);
+        let btn = document.createElement('button');
+        btn.innerText = 'Enable Manual Override';
+        content.appendChild(btn);
+        btn.addEventListener('click', () => {
+          checkboxManualOverride.checked = true;
+          this.sampleConfig.manualOverride = true;
+          popup.hide();
+        })
+        let popup = new Popup('Manual Override').insertAdjacentElement('beforeend', content).show();
+      } else {
+        this.sampleConfig.manualOverride = false;
+      }
+    })
+    body.appendChild(checkboxManualOverride);
   }
 
   deployHTML(container: HTMLElement, legendContainer: HTMLElement) {
@@ -512,7 +550,7 @@ export default class SampleManager {
       if (!this._legendData.hasOwnProperty(string)) {
         this._legendData[string] = createLegendDataItem(this.sampleConfig.legend, string);
       }
-      if (!atom.isStable()) radioactiveCount++;
+      if (!atom.get<boolean>('isStable')) radioactiveCount++;
       this._legendData[string].count++;
     });
 
@@ -541,8 +579,12 @@ export default class SampleManager {
     let string: string;
     if (legend === LegendOptionValues.Isotopes) string = atom.getIsotopeSymbol();
     else if (legend === LegendOptionValues.Elements) string = atom.getElementName();
-    else if (legend === LegendOptionValues.Radioactive) string = atom.isStable() ? 'Stable' : 'Radioactive';
-    else if (legend === LegendOptionValues.Decayed) string = atom.hasDecayed() ? 'Decayed' : 'Not Decayed';
+    else if (legend === LegendOptionValues.Radioactive) {
+      let s = atom.get<boolean>('isStable');
+      if (s === false) string = 'Stable';
+      else if (s === true) string = 'Radioactive';
+      else string = 'Unknown';
+    } else if (legend === LegendOptionValues.Decayed) string = atom.hasDecayed() ? 'Decayed' : 'Not Decayed';
     else if (legend === LegendOptionValues.DecayedTimes) string = (atom.getHistory().length - 1).toString();
     else throw new Error(`Unknown legend option ${legend}`);
     return string;
@@ -557,7 +599,9 @@ export default class SampleManager {
 function createLegendDataItem(option: LegendOptionValues, string: string): ILegendItem {
   let rgb: number[];
   if (option === LegendOptionValues.Radioactive) {
-    rgb = string == 'Radioactive' ? [0, 255, 229] : [255, 162, 0];
+    if (string == 'Radioactive') rgb = [0, 255, 229];
+    else if (string == 'Stable') rgb = [255, 162, 0];
+    else rgb = [200, 215, 125];
   } else if (option === LegendOptionValues.Decayed) {
     rgb = string == 'Decayed' ? [250, 0, 0] : [247, 247, 0];
   } else {

@@ -1,6 +1,6 @@
 import { DecayModes } from "./Atom";
 import elementData from "../data/elements.json";
-import { IAnalysisResult, IDecayInfo, IIsotopeInfo, ITimeObject } from "./InterfaceEnum";
+import { createAnalysisResultObject, IAnalyseStringComponent, IAnalysisResult, IDecayInfo, IIsotopeInfo, IIUPACNameSymbol, ITimeObject } from "./InterfaceEnum";
 
 export function rgbStringify(array: number[]) {
   if (array.length === 1) return `rgb(${array[0]}, ${array[0]}, ${array[0]})`;
@@ -105,6 +105,7 @@ export const nicifyNull = (string: string) => string == undefined || string == n
 
 export const RADIOACTIVE_SYMBOL_HTML = '&#9762;';
 export const RADIOACTIVE_SYMBOL = '☢';
+export const INFO_SYMBOL = 'ⓘ';
 
 export function getSuitableFontSize(text: string, fontFamily: string, max: number, min: number, maxWidth: number, ctx: CanvasRenderingContext2D) {
   let fontSize: number, originalFont = ctx.font;
@@ -181,38 +182,231 @@ export function removeChildren(el: HTMLElement) {
   }
 }
 
-export function analyseString(str: string): IAnalysisResult | null {
-  const obj: IAnalysisResult = { protons: NaN, neutrons: NaN, name: undefined, symbol: undefined, isotope: null }, lstr = str.toLowerCase();
-  if (elementData.order.indexOf(lstr) !== -1) {
-    obj.name = elementData[lstr].name;
-    obj.protons = elementData[lstr].number;
-    obj.neutrons = Math.round(elementData[lstr].atomic_mass);
-    obj.symbol = elementData[lstr].symbol;
-  } else {
-    let [symbol, mass] = str.split('-');
-    if (elementData.symbol_map.hasOwnProperty(symbol)) {
-      let element = elementData.symbol_map[symbol];
-      obj.name = elementData[element].name;
-      obj.symbol = elementData[element].symbol;
-      obj.protons = elementData[element].number;
-      obj.neutrons = Math.round(elementData[element].atomic_mass);
+const _IUPACNameParts = ["nil", "un", "bi", "tri", "quad", "pent", "hex", "sept", "oct", "enn"];
 
-      obj.isotope = { symbol: `${symbol}-${mass}`, parent: undefined, isomerNumber: NaN };
-      if (mass.indexOf('m') === -1) {
-        obj.isotope.parent = obj.isotope.symbol;
-      } else {
-        let [rmass, num] = mass.split('m');
-        if (num.length === 0) num = '1';
-        obj.isotope.isomerNumber = parseInt(num);
-        obj.isotope.parent = `${symbol}-${rmass}`;
+/** get IUAPC name/symbol from atomic number */
+function getIUPACNameSymbol(atomicNumber: number): IIUPACNameSymbol {
+  let name = "", symbol = "", number = atomicNumber.toString();
+  for (let i = 0; i < number.length; i++) {
+    let part = _IUPACNameParts[+number[i]];
+    name += part;
+    symbol += part[0];
+  }
+  return {
+    name: capitaliseString(name) + "ium",
+    symbol: capitaliseString(symbol),
+  };
+}
+
+/** Analyse symbol component */
+export function analyseSymbolString(symbol: string): IAnalyseStringComponent | null {
+  const obj: IAnalyseStringComponent = { symbol: undefined, name: undefined, IUPACName: undefined, IUPACSymbol: undefined, protons: undefined, };
+  symbol = capitaliseString(symbol);
+
+  // Exists?
+  if (elementData.symbol_map.hasOwnProperty(symbol)) {
+    let name = elementData.symbol_map[symbol];
+    obj.symbol = symbol;
+    obj.name = elementData[name].name;
+    obj.protons = elementData[name].number;
+
+    let iupac = getIUPACNameSymbol(obj.protons);
+    obj.IUPACName = iupac.name;
+    obj.IUPACSymbol = iupac.symbol;
+  } else {
+    let name = "", atomicNumberStr = "", lsymbol = symbol.toLowerCase();
+    for (let i = 0; i < lsymbol.length; i++) {
+      let ok = false;
+      for (let pi = 0; pi < _IUPACNameParts.length; pi++) {
+        if (lsymbol[i] === _IUPACNameParts[pi][0]) {
+          name += _IUPACNameParts[pi];
+          atomicNumberStr += pi.toString();
+          ok = true;
+          break;
+        }
       }
-    } else {
-      return null;
+      if (!ok) return null;
+    }
+    if (name.length === 0) return null;
+    obj.IUPACSymbol = symbol;
+    obj.IUPACName = capitaliseString(name) + "ium";
+    obj.protons = parseInt(atomicNumberStr);
+    if (elementData.order[obj.protons - 1]) {
+      let actualName = elementData.order[obj.protons - 1]
+      obj.name = elementData[actualName].name;
+      obj.symbol = elementData[actualName].symbol;
     }
   }
   return obj;
 }
-globalThis.analyseString = analyseString;
+
+export function analyseElementName(name: string): IAnalyseStringComponent | null {
+  let lname = name.toLowerCase();
+  const obj: IAnalyseStringComponent = { symbol: undefined, name: undefined, IUPACName: undefined, IUPACSymbol: undefined, protons: undefined, };
+
+  // Actual name?
+  if (elementData.order.indexOf(lname) !== -1) {
+    obj.name = elementData[lname].name;
+    obj.symbol = elementData[lname].symbol;
+    obj.protons = elementData[lname].number;
+
+    let ipuac = getIUPACNameSymbol(obj.protons);
+    obj.IUPACName = ipuac.name;
+    obj.IUPACSymbol = ipuac.symbol;
+  } else {
+    let name = lname.replace("ium", ""), symbol = "", atomicNumberStr = "";
+    for (let i = 0; i < name.length;) {
+      let ok = false;
+      for (let pi = 0; pi < _IUPACNameParts.length; pi++) {
+        let namePart = _IUPACNameParts[pi], strPart = name.substr(i, namePart.length);
+        if (namePart === strPart) {
+          ok = true;
+          symbol += namePart[0];
+          atomicNumberStr += pi.toString();
+          i += namePart.length;
+        }
+      }
+      if (!ok) return null;
+    }
+    obj.IUPACName = capitaliseString(lname);
+    obj.IUPACSymbol = capitaliseString(symbol);
+    obj.protons = parseInt(atomicNumberStr);
+    if (elementData.order[obj.protons - 1]) {
+      let actualName = elementData.order[obj.protons - 1]
+      obj.name = elementData[actualName].name;
+      obj.symbol = elementData[actualName].symbol;
+    }
+  }
+  return obj;
+}
+
+/**
+ * Estimate whether isotope with provided Z, N is stable
+ * - Source: https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Supplemental_Modules_(Physical_and_Theoretical_Chemistry)/Nuclear_Chemistry/Nuclear_Energetics_and_Stability/Nuclear_Magic_Numbers
+ */
+function estimateIsStable(Z: number, N: number) {
+  const A = Z + N;
+
+  // Is atomic number above Polonium?
+  if (Z >= 84) return false;
+
+  // If nucleon count is even, good chance that isotope is stable
+  if (A % 2 === 0) return true;
+
+  // Are the Z/N numbers a magic number?
+  const magicGeneral = [2, 8, 20, 28, 50, 82], magicProtons = [114], magicNeutrons = [126, 184];
+  if (magicGeneral.indexOf(Z) !== -1 || magicGeneral.indexOf(N) !== -1) return true;
+  if (magicNeutrons.indexOf(N) !== -1) return true;
+  if (magicProtons.indexOf(Z) !== -1) return true;
+
+  // N:Z ratio
+  const R = N / Z;
+  if (R < 1) return false;
+}
+
+export function analyseString(str: string): IAnalysisResult | null {
+  const obj = createAnalysisResultObject(), lstr = str.toLowerCase();
+  let atomicMass: number;
+
+  if (lstr.indexOf('-') !== -1) {
+    /// ISOTOPE FORMAT!
+    let [identifier, mass] = lstr.split('-');
+    atomicMass = parseInt(mass);
+    str = identifier;
+
+    if (mass.indexOf('m') !== -1) {
+      let [_, n] = mass.split('m');
+      if (n.length === 0) n = '0'; // Default one
+      obj.isotopicIsomerNumber = parseInt(n);
+    }
+  }
+
+  // Is element name?
+  let analysis = analyseElementName(str);
+  if (analysis == null) {
+    // Is symbol?
+    analysis = analyseSymbolString(str);
+  }
+
+  if (analysis != null) {
+    obj.name = analysis.name;
+    obj.IUPACName = analysis.IUPACName;
+    obj.symbol = analysis.symbol;
+    obj.IUPACSymbol = analysis.IUPACSymbol;
+    obj.protons = analysis.protons;
+    if (atomicMass == undefined) {
+      if (obj.name) {
+        atomicMass = elementData[obj.name.toLowerCase()].atomic_mass;
+      } else {
+        throw new Error(`analyseString: neutron count must be stated for theoretical elements - '${str}'`);
+      }
+    }
+  } else {
+    return null; // No flippin' clue.
+  }
+
+  // Get neutron number
+  if (typeof atomicMass === 'number') {
+    obj.neutrons = Math.round(atomicMass - obj.protons);
+  }
+
+  // Get isotope symbol
+  if (!isNaN(obj.neutrons)) {
+    obj.isotopeSymbol = `${obj.symbol || obj.IUPACSymbol}-${obj.neutrons + obj.protons}`;
+    if (obj.isotopicIsomerNumber != undefined) {
+      obj.isotopicIsomerParent = obj.isotopeSymbol; // Parent isotope (without 'm')
+      obj.isotopeSymbol += 'm';
+      if (obj.isotopicIsomerNumber !== 0) obj.isotopeSymbol += obj.isotopicIsomerNumber.toString();
+    }
+  }
+
+  if (obj.name) {
+    let data = elementData[obj.name.toLowerCase()];
+    if (data) {
+      obj.exists = data.isotopes[obj.isotopeSymbol] != undefined;
+    } else {
+      obj.exists = false;
+    }
+  } else {
+    obj.exists = false;
+  }
+
+  return Object.freeze(obj);
+}
+
+export function getAtomInfo(protons: number, neutrons: number): IAnalysisResult | null {
+  const obj = createAnalysisResultObject();
+  obj.protons = protons;
+  obj.neutrons = neutrons;
+  obj.exists = false; // Assume that it does not exist
+
+  // Does the element exist?
+  if (elementData.order[protons - 1] != undefined) {
+    const name = elementData.order[protons - 1];
+    obj.name = elementData[name].name;
+    obj.symbol = elementData[name].symbol;
+  } else {
+    obj.exists = false;
+    const iupac = getIUPACNameSymbol(protons);
+    obj.IUPACName = iupac.name;
+    obj.IUPACSymbol = iupac.symbol;
+  }
+
+  // Isotope
+  obj.isotopeSymbol = (obj.symbol || obj.IUPACSymbol) + '-' + (protons + neutrons).toString();
+
+  // Does isotope exist?
+  if (obj.name) {
+    const idata = elementData[obj.name.toLowerCase()].isotopes[obj.isotopeSymbol];
+    if (idata) {
+      obj.exists = true;
+      obj.isStable = idata.is_stable;
+      obj.halflife = idata.halflife;
+    }
+  }
+
+  return Object.freeze(obj);
+}
 
 export function hslToRgb(h: number, s: number, l: number) {
   // Must be fractions of 1

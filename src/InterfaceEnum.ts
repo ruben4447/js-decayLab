@@ -5,6 +5,11 @@ export interface IDecayInfo {
     percentage?: number;
 }
 
+/** Interface for ATTEMPTED isotope decay info */
+export interface IAttemptedDecayInfo extends IDecayInfo {
+    success: boolean;
+}
+
 /** Interface for isotope information */
 export interface IIsotopeInfo {
     name: string; // Name of element
@@ -58,6 +63,8 @@ export interface ISampleConfig {
     renderMode: RenderMode;
     legend: LegendOptionValues; // Legend to display
     legendLength: number; // Number of items in legend
+    manualOverride: boolean; // Allow e.g. force decay and stuff
+
 }
 
 /** Function that creates a default version of ISampleConfig */
@@ -69,6 +76,7 @@ export function createSampleConfigObject(): ISampleConfig {
         renderMode: RenderMode.Atoms,
         legend: LegendOptionValues.None,
         legendLength: 7,
+        manualOverride: false,
     };
 }
 
@@ -79,15 +87,40 @@ export interface ITimeObject {
 }
 
 export interface IAnalysisResult {
-    name: string; // Element name
-    symbol: string; // Element symbol
+    exists: boolean;
+    name: string; // Element name e.g. "Uranium"
+    symbol: string; // Element symbol e.g. "U"
     protons: number;
     neutrons: number;
-    isotope: IIsotopeAnalysisResult | null;
+    isotopeSymbol: string; // Isotope symbol e.g. "U-235"
+    isotopicIsomerNumber?: number; // Number after 'm' e.g. "In-119m2"
+    isotopicIsomerParent?: string; // If isotopicIsomerNumber is !NaN, then contains parent e.g. parent of "In-119m2" is "In-119"
+    IUPACName: string;
+    IUPACSymbol: string;
+    isStable: boolean; // If isotope does not exist, make estimate
+    halflife: number; // If not exist, set to NaN (even if theoretical isStable is true)
 }
 
-export interface IIsotopeAnalysisResult {
-    symbol: string;
-    parent: string; // Same as 'symbol' unless is isomer
-    isomerNumber: number; // Number after 'm' e.g. 'In-119m2'. Default is NaN.
+export function createAnalysisResultObject(): IAnalysisResult {
+    return {
+        exists: undefined,
+        name: undefined,
+        symbol: undefined,
+        protons: NaN,
+        neutrons: NaN,
+        isotopeSymbol: undefined,
+        IUPACName: undefined,
+        IUPACSymbol: undefined,
+        isStable: undefined,
+        halflife: NaN,
+    };
+}
+
+export interface IAnalyseStringComponent {
+    symbol: string, name: string, IUPACName: string, IUPACSymbol: string, protons: number,
+}
+
+/** Return value from getIUPACNameSymbol */
+export interface IIUPACNameSymbol {
+    name: string, symbol: string,
 }

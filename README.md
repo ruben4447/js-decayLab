@@ -25,10 +25,18 @@ You can interact with each isotope in the sample:
 - Press `h` : View decay history of that atom
 - Press `Delete` : Prompt to remove isotope from sample
 - Press `l` : log isotope object to developer console
-- Press `d` : Force-decay isotope
 
 ## Legend
 This shows an overview of the sample.
 Depending on the option, it will either by nothing, show each isotope, or show each element.
 Click on `View All` to show every item in the legend
 Click on the label next to the colour box to bring up info. Hover over the percentage to see number of atoms and exact percentage (displayed percentage is rounded)
+
+## Manual Override
+*Options -> Manual Override*
+Allows the user to take manual control of physical processes which would otherwise be impossible e.g. inserting imporrible isotopes (e.g. U-100) and force-decay
+
+The following functionaity is added when an atom is clicked on:
+	- 'd' : force-decay isotope, but abide by normal decay rules of that isotope (e.g. 'd' over a stable isotop would not decay it)
+	- '#' : [DEBUG] set globals.atom equal to the current atom
+	- Shift + 'd' : open force-decay isotope. Choose method of decay to inflict (e.g. alpha decay). Works on any isotopes.

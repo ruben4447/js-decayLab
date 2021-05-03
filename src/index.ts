@@ -28,7 +28,11 @@ async function main() {
   globals.sample = sample;
   sample.onAtomDecay((atom, info, time) => {
     manager.updateLegend();
-    console.log(`%c[${time} s] ${arrFromBack(atom.getHistory(), 2)} -> (${info.mode}) -> ${atom.getIsotopeSymbol()}`, 'font-style:italic;');
+    if (info.success) {
+      console.log(`%c✓ [${time} s] decay: ${arrFromBack(atom.getHistory(), 2)} -> (${info.mode}) -> ${atom.getIsotopeSymbol()}`, 'color:forestgreen;');
+    } else {
+      console.log(`%c⨯ [${time} s] decay failed: ${atom.getIsotopeSymbol()} -> (${info.mode}) -> ${info.daughter}`, 'color:tomato;');
+    }
   });
 
   const manager = new SampleManager(wrapper);
@@ -38,20 +42,23 @@ async function main() {
   manager.setSample(sample);
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
   manager.sampleConfig.legend = LegendOptionValues.Radioactive;
+  manager.sampleConfig.manualOverride = true;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();
 
-  for (let i = 0; i < 100; i++) {
-    let element = randomChoice(elementData.order);
-    let isotope = randomChoice(Object.keys(elementData[element].isotopes));
-    if (isotope == undefined) {
-      i--;
-    } else {
-      let atom = Atom.fromIsotopeString(isotope);
-      manager.addAtomToSample(atom);
-    }
-  }
+  manager.addAtomToSample(new Atom("Ub-429"));
+
+  // for (let i = 0; i < 100; i++) {
+  //   let element = randomChoice(elementData.order);
+  //   let isotope = randomChoice(Object.keys(elementData[element].isotopes));
+  //   if (isotope == undefined) {
+  //     i--;
+  //   } else {
+  //     let atom = Atom.fromIsotopeString(isotope);
+  //     manager.addAtomToSample(atom);
+  //   }
+  // }
 }
 
 main();

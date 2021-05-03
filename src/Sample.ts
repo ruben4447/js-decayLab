@@ -2,9 +2,9 @@ import Atom from './Atom';
 import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString } from './utils';
 import SampleManager from './SampleManager';
 import DecayAnimation from './DecayAnimation';
-import { IDecayInfo } from './InterfaceEnum';
+import { IAttemptedDecayInfo } from './InterfaceEnum';
 
-type AtomDecayCallback = (atom: Atom, info: IDecayInfo, time: number) => void;
+type AtomDecayCallback = (atom: Atom, info: IAttemptedDecayInfo, time: number) => void;
 
 export class Sample {
   private _animations: DecayAnimation[] = [];
@@ -22,7 +22,7 @@ export class Sample {
   }
 
   getAtomCount() { return this._atoms.length; }
-  
+
   render(manager: SampleManager) {
     this._atoms.forEach(atom => atom.render(manager));
     for (let i = this._animations.length - 1; i >= 0; i--) {
@@ -70,12 +70,14 @@ export class Sample {
   /** Decay an atom. Return did it decay? */
   atomDecay(atom: Atom, force: boolean = false) {
     if (force || probability(atom.decayChancePerSecond() * this._incTimeAmount)) {
-      if (!atom.isStable()) {
+      if (atom.get<boolean>('isStable') === false) {
         let info = atom.decay();
         if (info) {
-          this._animations.push(new DecayAnimation(atom, info)); // Push decay animation
+          if (info.success) this._animations.push(new DecayAnimation(atom, info)); // Push decay animation
           if (typeof this._callbackAtomDecay === 'function') this._callbackAtomDecay(atom, info, this._time);
-          return true;
+          return info.success;
+        } else {
+          return false;
         }
       }
     }
