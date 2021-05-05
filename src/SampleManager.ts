@@ -1,10 +1,10 @@
 import type Sample from './Sample';
 import { bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
-import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateElementInfo, generateForceDecayInterface, generateFullLegend, generatePeriodicTable } from './generate-info';
+import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateEditProtonNeutronCount, generateElementInfo, generateForceDecayInterface, generateFullLegend, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
 import Piechart from './Piechart';
-import { createSampleConfigObject, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
+import { createSampleConfigObject, EnumDecayMode, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
 import globals from './globals';
 
 export default class SampleManager {
@@ -215,8 +215,21 @@ export default class SampleManager {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (Popup.popupsOpen() === 0 && self.sampleConfig.interactive) {
+        if (event.key == ' ' && self.sampleConfig.bindSpacebar) {
+          /// TOGGLE SIMULATION
+          // TODO: upgrade to change GUI as well
+          if (self._sample.isSimulationRunning()) {
+            self._sample.stopSimulation();
+            console.log("Simulation: stopping");
+          } else {
+            self.prepareForSimulation();
+            self._sample.startSimulation();
+            console.log("Simulation: starting");
+          }
+        }
+
         /// RenderMode=Atoms
-        if (self.sampleConfig.renderMode == RenderMode.Atoms) {
+        else if (self.sampleConfig.renderMode == RenderMode.Atoms) {
           if (_atomOver != null) {
             /// RenderMode=Atoms
             if (event.key == 'l') {
@@ -238,7 +251,7 @@ export default class SampleManager {
               }
             } else if (event.key == 'h') {
               /// DECAY HISTORY
-              const { title, body } = generateDecayHistory(_atomOver.getHistory());
+              const { title, body } = generateDecayHistory(_atomOver);
               new Popup(title).insertAdjacentElement('beforeend', body).show();
             } else if (this.sampleConfig.manualOverride) {
               // More options for manual Override
@@ -251,8 +264,26 @@ export default class SampleManager {
                 globals.atom = _atomOver;
               } else if (event.key == 'D') {
                 /// FORCE DECAY (interface)
-                const { title, body } = generateForceDecayInterface(mode => console.log(mode));
+                let { title, body } = generateForceDecayInterface((mode, n, p) => {
+                  this._sample.forcedAtomDecay(_atomOver, mode, n, p);
+                });
+                title += `: ${_atomOver.getIsotopeSymbol()}`;
                 new Popup(title).insertAdjacentElement('beforeend', body).show();
+              } else if (event.key == 'A') {
+                /// FORCE DECAY: alpha
+                this._sample.forcedAtomDecay(_atomOver, EnumDecayMode.Alpha);
+              } else if (event.key == 'E') {
+                // EDIT PROTON/NEUTRON COUNT
+                let { title, body } = generateEditProtonNeutronCount(_atomOver.get<number>("protons"), _atomOver.get<number>("neutrons"), (p, n) => {
+                  if (n < 0 || p < 1) {
+                    new Popup('Unable to Make Changes').insertAdjacentText('beforeend', `Invalid nucleon count: ${p} protons, ${n} neutrons`).show();
+                  } else {
+                    _atomOver.set(p, n);
+                    popup.hide();
+                  }
+                });
+                title += ': ' + _atomOver.getIsotopeSymbol();
+                let popup = new Popup(title).insertAdjacentElement('beforeend', body).show();
               }
             }
           }
@@ -294,7 +325,7 @@ export default class SampleManager {
       }
     }
 
-    body.insertAdjacentHTML('beforeend', '<br><abbr title="Interactive canvas">Interactive</abbr>: ');
+    body.insertAdjacentHTML('beforeend', '<br><abbr title="Interactive canvas/webpage">Interactive</abbr>: ');
     let checkboxInteractive = document.createElement('input');
     checkboxInteractive.type = 'checkbox';
     checkboxInteractive.checked = this.sampleConfig.interactive;
@@ -302,6 +333,15 @@ export default class SampleManager {
       this.sampleConfig.interactive = checkboxInteractive.checked;
     });
     body.appendChild(checkboxInteractive);
+
+    body.insertAdjacentHTML('beforeend', '<br><abbr title="Pressing spacebar starts/stops the simulation">Bind Spacebar</abbr>: ');
+    let checkboxBindSpacebar = document.createElement('input');
+    checkboxBindSpacebar.type = 'checkbox';
+    checkboxBindSpacebar.checked = this.sampleConfig.bindSpacebar;
+    checkboxBindSpacebar.addEventListener('change', () => {
+      this.sampleConfig.bindSpacebar = checkboxBindSpacebar.checked;
+    });
+    body.appendChild(checkboxBindSpacebar);
 
     /// DIMENSIONS
     body.insertAdjacentHTML('beforeend', '<hr><span class="heading">Dimensions</span><br>');
@@ -596,8 +636,8 @@ export default class SampleManager {
     else if (legend === LegendOptionValues.Elements) string = atom.getElementName();
     else if (legend === LegendOptionValues.Radioactive) {
       let s = atom.get<boolean>('isStable');
-      if (s === false) string = 'Stable';
-      else if (s === true) string = 'Radioactive';
+      if (s === true) string = 'Stable';
+      else if (s === false) string = 'Radioactive';
       else string = 'Unknown';
     } else if (legend === LegendOptionValues.Decayed) string = atom.hasDecayed() ? 'Decayed' : 'Not Decayed';
     else if (legend === LegendOptionValues.DecayedTimes) string = (atom.getHistory().length - 1).toString();

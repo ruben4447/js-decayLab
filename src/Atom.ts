@@ -1,8 +1,8 @@
 import elementData from '../data/elements.json';
 import categoryColours from '../data/categories.json';
 import SampleManager from './SampleManager';
-import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, getNeutronsProtonsFromIsotopeString, probability, analyseString, getAtomInfo } from './utils';
-import { EnumDecayModes, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, IDecayModes, LegendOptionValues } from './InterfaceEnum';
+import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, getNeutronsProtonsFromIsotopeString, probability, analyseString, getAtomInfo, decaySymbolToEnumValue } from './utils';
+import { EnumDecayMode, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, IDecayModes, LegendOptionValues } from './InterfaceEnum';
 
 globalThis.elementData = elementData;
 const HIGHLIGHT_COLOUR = rgbStringify([255, 50, 250]);
@@ -18,7 +18,7 @@ export default class Atom {
   public x: number;
   public y: number;
   public highlighted: boolean = false;
-  private _history: string[]; // Array of historical isotopes. Populated from successful decay via this.decay()
+  private _history: IDecayInfo[]; // Array of historical isotopes. Populated from successful decay via this.decay()
 
   /**
    * Multiple Methods:
@@ -39,7 +39,7 @@ export default class Atom {
     } else {
       throw new TypeError(`new Atom(${a}: ${typeof a}, ${b}: ${typeof b}): no constructor of Atom takes provided arguments`);
     }
-    this._history = [this.getIsotopeSymbol()];
+    this.resetHistory();
   }
 
   /** Set position */
@@ -173,16 +173,22 @@ export default class Atom {
     let obj: IAttemptedDecayInfo = { ...decayInfo, success: undefined };
     if (decayInfo) {
       try {
-        const [protons, neutrons] = getNeutronsProtonsFromIsotopeString(decayInfo.daughter);
-        this.set(protons, neutrons);
-        this._history.push(this.getIsotopeSymbol()); // Push new isotope to history
+        this.setString(decayInfo.daughter);
         obj.success = true;
       } catch (e) {
-        // console.log(`Unable to decay atom ${this.getIsotopeSymbol()} to ${decayInfo.daughter} (${decayInfo.mode})`);
         obj.success = false;
+        obj.error = e;
       }
     } else {
       obj.success = false;
+    }
+
+    // If sucessful...
+    if (obj.success) {
+      // obj.mode: turn string symbol to EnumDecayMode
+      obj.mode = decaySymbolToEnumValue(obj.mode.toString());
+      // Add to history
+      this._history.push({ daughter: obj.daughter, mode: obj.mode });
     }
 
     return obj;
@@ -194,7 +200,7 @@ export default class Atom {
   }
 
   getHistory() { return [...this._history]; }
-  resetHistory() { this._history = [this.getIsotopeSymbol()]; }
+  resetHistory() { this._history = [{ daughter: this.getIsotopeSymbol(), mode: undefined }]; }
 
   /** Has this atom decayed? */
   hasDecayed() {
@@ -204,38 +210,63 @@ export default class Atom {
   /** Return duplicate of self */
   clone() { return new Atom(this._data.protons, this._data.neutrons); }
 
-  /** Force a decay */
-  forceDecay(mode: EnumDecayModes) {
-    let Δp = 0, Δn = 0;
+  /**
+   * Force decay
+   * @param mode - Decay mode to inflict
+   * @param neutrons - e.g. neutrons lost in NeutronEmission, neutrons of cluster in ClusterDecay
+   * @param protons - e.g. proton count in ClusterDecay
+   */
+  forceDecay(mode: EnumDecayMode, neutrons?: number, protons?: number): IAttemptedDecayInfo {
+    let Δp = 0, Δn = 0, error: Error;
     switch (mode) {
-      case EnumDecayModes.Alpha:
+      case EnumDecayMode.Alpha:
         // Eject helium-4 nucleus (aka. alpha particle)
         Δp = -2;
         Δn = -2;
         break;
-      case EnumDecayModes.BetaMinus:
+      case EnumDecayMode.BetaMinus:
         // Eject electron and antineutrino - neutron to proton
         Δp = 1;
         Δn = -1;
         break;
-      case EnumDecayModes.BetaPlus:
+      case EnumDecayMode.BetaPlus:
         // Eject positron and neutrino - proton to neutron
         Δp = -1;
         Δn = 1;
         break;
-      case EnumDecayModes.NeutronEmission:
+      case EnumDecayMode.NeutronEmission:
         // Eject 1 or more neutrons
-        Δn = -1;
+        Δn = -Math.floor(neutrons == undefined ? 1 : neutrons);
         break;
-      case EnumDecayModes.ElectronCapture:
+      case EnumDecayMode.ElectronCapture:
         // Nuclear captures an orbiting electron, converting a proton to convert into a neutron
         Δp = -1;
         Δn = 1;
         break;
+      case EnumDecayMode.ClusterDecay:
+        // Emit small cluster
+        if (protons == undefined || neutrons == undefined) {
+          error = new Error(`ClusterDecay: 'protons' and 'neutrons' arguments are required`);
+        } else {
+          Δp = -Math.floor(protons);
+          Δn = -Math.floor(neutrons);
+        }
+        break;
       default:
-        throw new TypeError(`Unknown or unsupported decay mode: "${mode}"`);
+        error = new TypeError(`Unknown or unsupported decay mode: "${mode}"`);
     }
 
-    this.set(this._data.protons + Δp, this._data.neutrons + Δn);
+    if (error) {
+      return { daughter: '?', mode, success: false, error };
+    } else {
+      let newp = this._data.protons + Δp, newn = this._data.neutrons + Δn;
+      if (newp < 1 || newn < 0) {
+        return { daughter: '?', mode, success: false, error: new Error(`Cannot undergo decay: nucleon proportion would be invalid (p ${newp}, n ${newn})`) };
+      } else {
+        this.set(newp, newn);
+        this._history.push({ daughter: this.getIsotopeSymbol(), mode });
+        return { daughter: this.getIsotopeSymbol(), mode, success: true };
+      }
+    }
   }
 }

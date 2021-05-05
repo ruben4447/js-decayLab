@@ -3,11 +3,14 @@ import Atom from './Atom';
 import SampleManager from './SampleManager';
 import Popup from './Popup';
 import globals from './globals';
-import elementData from '../data/elements.json';
 import { arrFromBack, randomChoice } from './utils';
-import { LegendOptionValues, RenderMode } from './InterfaceEnum';
+import { DecayMode, EnumDecayMode, LegendOptionValues, RenderMode } from './InterfaceEnum';
+
+import * as utils from './utils';
+globalThis.utils = utils;
 
 var wrapper: HTMLElement;
+globalThis.EnumDecayModes = EnumDecayMode;
 
 async function main() {
   wrapper = document.getElementById('wrapper');
@@ -27,11 +30,12 @@ async function main() {
   const sample = new Sample();
   globals.sample = sample;
   sample.onAtomDecay((atom, info, time) => {
+    const dmode = DecayMode[EnumDecayMode[info.mode]];
     manager.updateLegend();
     if (info.success) {
-      console.log(`%c✓ [${time} s] decay: ${arrFromBack(atom.getHistory(), 2)} -> (${info.mode}) -> ${atom.getIsotopeSymbol()}`, 'color:forestgreen;');
+      console.log(`%c✓ [${time} s] decay: ${arrFromBack(atom.getHistory(), 2).daughter} -> (${dmode}) -> ${atom.getIsotopeSymbol()}`, 'color:forestgreen;');
     } else {
-      console.log(`%c⨯ [${time} s] decay failed: ${atom.getIsotopeSymbol()} -> (${info.mode}) -> ${info.daughter}`, 'color:tomato;');
+      console.log(`%c⨯ [${time} s] decay failed: ${atom.getIsotopeSymbol()} -> (${dmode}) -> ${info.daughter}\n%c${info.error.message}`, 'color:tomato;', 'color:yellow;background:black;');
     }
   });
   sample.onAtomRemove(atom => {
@@ -50,7 +54,9 @@ async function main() {
   manager.setupLegend();
   manager.start();
 
-  manager.addAtomToSample(new Atom("Ub-429"));
+  let atom = new Atom("U-236");
+  manager.addAtomToSample(atom);
+  globals.atom = atom;
 
   // for (let i = 0; i < 100; i++) {
   //   let element = randomChoice(elementData.order);

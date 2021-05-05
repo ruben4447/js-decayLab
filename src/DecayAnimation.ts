@@ -1,5 +1,5 @@
 import Atom from "./Atom";
-import { IDecayInfo } from "./InterfaceEnum";
+import { DecayMode, EnumDecayMode, IDecayInfo } from "./InterfaceEnum";
 import SampleManager from "./SampleManager";
 import { getSuitableFontSize, TWO_PI } from "./utils";
 
@@ -12,7 +12,8 @@ export default class DecayAnimation {
   private _colourStage: number = 1;
   private _minRadius: number;
   private _maxRadius: number;
-  private _decayMode: string;
+  private _decayMode: EnumDecayMode;
+  private _decayModeSymbol: string;
   public x: number;
   public y: number;
 
@@ -22,6 +23,7 @@ export default class DecayAnimation {
     this.x = atom.x;
     this.y = atom.y;
     this._decayMode = decayInfo.mode;
+    this._decayModeSymbol = DecayMode[EnumDecayMode[this._decayMode]];
   }
 
   isDone() { return this._done; }
@@ -31,7 +33,7 @@ export default class DecayAnimation {
   }
 
   getTextSize(ctx: CanvasRenderingContext2D) {
-    return getSuitableFontSize(this._decayMode, 'Arial', 100, 10, 2 * this.getRadius(), ctx);
+    return getSuitableFontSize(this._decayModeSymbol, 'Arial', 100, 10, 2 * this.getRadius(), ctx);
   }
 
   /** Return: are we finished? */
@@ -51,7 +53,7 @@ export default class DecayAnimation {
     let size = this.getTextSize(ctx);
     ctx.font = size + 'px Arial';
     ctx.fillStyle = 'black';
-    ctx.fillText(this._decayMode, this.x, this.y);
+    ctx.fillText(this._decayModeSymbol, this.x, this.y);
 
     this._frame++;
 

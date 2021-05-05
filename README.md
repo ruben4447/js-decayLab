@@ -40,3 +40,5 @@ The following functionaity is added when an atom is clicked on:
 	- 'd' : force-decay isotope, but abide by normal decay rules of that isotope (e.g. 'd' over a stable isotop would not decay it)
 	- '#' : [DEBUG] set globals.atom equal to the current atom
 	- Shift + 'd' : open force-decay isotope. Choose method of decay to inflict (e.g. alpha decay). Works on any isotopes.
+	- Shift + 'a' : force alpha decay (same as shift + d then selecting 'Alpha')
+	- Shift + 'e' : edit nucleon count of atom

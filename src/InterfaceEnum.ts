@@ -1,13 +1,14 @@
 /** Interface for isotope decay info */
 export interface IDecayInfo {
     daughter?: string;
-    mode?: string;
+    mode?: EnumDecayMode;
     percentage?: number;
 }
 
 /** Interface for ATTEMPTED isotope decay info */
 export interface IAttemptedDecayInfo extends IDecayInfo {
     success: boolean;
+    error?: Error;
 }
 
 /** Interface for isotope information */
@@ -64,7 +65,7 @@ export interface ISampleConfig {
     legend: LegendOptionValues; // Legend to display
     legendLength: number; // Number of items in legend
     manualOverride: boolean; // Allow e.g. force decay and stuff
-
+    bindSpacebar: boolean; // Bind spacebar to start/stop the simulation?
 }
 
 /** Function that creates a default version of ISampleConfig */
@@ -77,6 +78,7 @@ export function createSampleConfigObject(): ISampleConfig {
         legend: LegendOptionValues.None,
         legendLength: 7,
         manualOverride: false,
+        bindSpacebar: false,
     };
 }
 
@@ -126,7 +128,7 @@ export interface IIUPACNameSymbol {
 }
 
 /** Decay modes (values of each in atom.ts/DecayModes) */
-export const DecayModes = {
+export const DecayMode = {
     Alpha: 'α',
     BetaMinus: 'β−',
     BetaPlus: 'β+',
@@ -137,6 +139,18 @@ export const DecayModes = {
     ClusterDecay: "CD",
 };
 
-export enum EnumDecayModes {
+/** Decay mode info */
+export const DecayModeDescription = {
+    Alpha: 'Eject an alpha particle (He-4)',
+    BetaMinus: 'Eject an electron and an antineutrino - turn neutron to proton',
+    BetaPlus: 'Eject a positron and a neutrino - turn proton to neutron',
+    NeutronEmission: 'Eject 1 or more neutrons',
+    // SpontaneousFission: '',
+    ElectronCapture: 'Nucleus captures an orbiting electron, converting a proton into a neutron',
+    // NuclearIsomer: '',
+    ClusterDecay: 'Emits small cluster of nucleons',
+};
+
+export enum EnumDecayMode {
     Alpha, BetaMinus, BetaPlus, NeutronEmission, SpontaneousFission, ElectronCapture, NuclearIsomer, ClusterDecay
 }

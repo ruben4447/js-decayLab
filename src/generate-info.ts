@@ -1,10 +1,10 @@
 import Atom from './Atom';
 import Popup from './Popup';
-import { numberWithCommas, secondsToAppropriateTime, createLink, capitaliseString, nicifyNull, RADIOACTIVE_SYMBOL, decayModeToString, getIsotopeDecayInfo, round, analyseString, INFO_SYMBOL, analyseElementName } from './utils';
+import { numberWithCommas, secondsToAppropriateTime, createLink, capitaliseString, nicifyNull, RADIOACTIVE_SYMBOL, decaySymbolToEnumValue, getIsotopeDecayInfo, round, analyseString, INFO_SYMBOL, analyseElementName, getAtomInfo, spaceBetweenCaps } from './utils';
 import elementData from '../data/elements.json';
 import ptableData from '../data/ptable.json';
 import globals from './globals';
-import { IAnalysisResult, IDecayInfo, IGeneratedInfo, ILegendItem, LegendOptionValues } from './InterfaceEnum';
+import { DecayMode, DecayModeDescription, EnumDecayMode, IAnalysisResult, IDecayInfo, IGeneratedInfo, ILegendItem, LegendOptionValues } from './InterfaceEnum';
 
 export function generateAtomInfo(string: string): IGeneratedInfo {
   const table = document.createElement("table"), data = analyseString(string), body = document.createElement("div");
@@ -51,7 +51,7 @@ export function generateAtomInfo(string: string): IGeneratedInfo {
   if (data.isStable === true) {
     table.insertAdjacentHTML('beforeend', `<tr><th>Halflife</th><td><em>Stable</em></td></tr>`);
   } else if (data.isStable === false) {
-    let idata = elementData[data.name].isotopes[data.isotopeSymbol];
+    let idata = elementData[data.name.toLowerCase()].isotopes[data.isotopeSymbol];
 
     let { unit, time } = secondsToAppropriateTime(idata.halflife);
     let halflife = idata.halflife == undefined ? nicifyNull(null) : numberWithCommas(idata.halflife);
@@ -90,7 +90,8 @@ export function generateAtomInfo(string: string): IGeneratedInfo {
 
       // Decay Mode
       td = document.createElement("td");
-      td.insertAdjacentHTML("beforeend", `<abbr title='${decayModeToString(decayInfo.mode)}'>${nicifyNull(decayInfo.mode)}</abbr>`);
+      let decayValue = decaySymbolToEnumValue(decayInfo.mode);
+      td.insertAdjacentHTML("beforeend", `<abbr title='${decayValue == null ? '<unknown>' : EnumDecayMode[decayValue]}'>${nicifyNull(decayInfo.mode)}</abbr>`);
       tr.appendChild(td);
 
       // Percentage
@@ -178,28 +179,28 @@ function _generateDecayChain(decayInfo: IDecayInfo): HTMLDivElement {
 }
 
 /** Generate decay line from array of historical isotopes */
-export function generateDecayHistory(history: string[]): IGeneratedInfo {
-  const body = document.createElement('div');
+export function generateDecayHistory(atom: Atom): IGeneratedInfo {
+  const body = document.createElement('div'), history = atom.getHistory();
   body.classList.add('decay-history');
 
   for (let i = 0; i < history.length; i++) {
-    let current = history[i];
+    let current: IDecayInfo = history[i];
 
-    let link = createLink(current);
+    if (typeof current.mode === 'number') {
+      body.insertAdjacentHTML('beforeend', '&nbsp;&nbsp;&rarr;&nbsp;');
+      let symbol = DecayMode[EnumDecayMode[current.mode]];
+      body.insertAdjacentHTML('beforeend', `<abbr title='${spaceBetweenCaps(EnumDecayMode[current.mode])}'>(${nicifyNull(symbol)})</abbr> &rarr;&nbsp;&nbsp;`);
+    }
+
+    let link = createLink(current.daughter);
     link.addEventListener('click', () => {
-      const { title, body } = generateAtomInfo(current);
+      const { title, body } = generateAtomInfo(current.daughter);
       new Popup(title).insertAdjacentElement('beforeend', body).show();
     });
     body.insertAdjacentElement('beforeend', link);
-
-    if (i < history.length - 1) {
-      body.insertAdjacentHTML('beforeend', '&nbsp;&nbsp;&rarr;&nbsp;');
-      const decayInfo = getIsotopeDecayInfo(current, history[i + 1]);
-      body.insertAdjacentHTML('beforeend', `(${nicifyNull(decayInfo.mode)}) &rarr;&nbsp;&nbsp;`);
-    }
   }
 
-  return { title: `Decay of ${history[0]}`, body };
+  return { title: `Decay of ${history[0].daughter}`, body };
 }
 
 /** ELement Plaque */
@@ -373,6 +374,38 @@ export function generateCustomIsotopePopup(callback: (data: IAnalysisResult) => 
   return { title: "Custom Isotope", body };
 }
 
+export function generateEditProtonNeutronCount(protons: number, neutrons: number, callback: (protons: number, neutrons: number) => void): IGeneratedInfo {
+  const body = document.createElement('div');
+  body.classList.add('edit-pn-numbers');
+
+  // Protons
+  body.insertAdjacentHTML('beforeend', `<span class="heading">Protons</span>`);
+  body.insertAdjacentHTML('beforeend', `<p>Started at ${protons} protons</p>`);
+  let inputProtons = document.createElement("input");
+  inputProtons.type = "number";
+  inputProtons.min = "1";
+  inputProtons.value = protons.toString();
+  body.appendChild(inputProtons);
+
+  // Neutrons
+  body.insertAdjacentHTML('beforeend', `<br><br><span class="heading">Neutrons</span>`);
+  body.insertAdjacentHTML('beforeend', `<p>Started at ${neutrons} neutrons</p>`);
+  let inputNeutrons = document.createElement("input");
+  inputNeutrons.type = "number";
+  inputNeutrons.min = "0";
+  inputNeutrons.value = neutrons.toString();
+  body.appendChild(inputNeutrons);
+
+  // Button
+  body.insertAdjacentHTML('beforeend', '<hr>');
+  let btn = document.createElement('button');
+  btn.innerText = 'Make Changes';
+  btn.addEventListener('click', () => callback(parseInt(inputProtons.value), parseInt(inputNeutrons.value)));
+  body.appendChild(btn);
+
+  return { title: "Edit Nucleons", body };
+}
+
 /** Click on legend link; Return: was a popup opened? */
 export function clickLegendLink(legend: LegendOptionValues, string: string) {
   let info: IGeneratedInfo;
@@ -487,13 +520,67 @@ export function generateFullLegend(total: number, legendData: { [item: string]: 
   return div;
 }
 
-export function generateForceDecayInterface(callback: (mode: string) => void): IGeneratedInfo {
+type ForceDecayCallback = (mode: EnumDecayMode, neutrons?: number, protons?: number) => void;
+export function generateForceDecayInterface(callback: ForceDecayCallback): IGeneratedInfo {
   const body = document.createElement('div');
   body.classList.add('force-decay-popup');
+  body.classList.add('scroll-window');
 
-  // TODO: Implement this :)
-  // https://en.wikipedia.org/wiki/Radioactive_decay
-  body.insertAdjacentHTML('beforeend', `<em>Not Implemented</em>`);
+  for (let mode in DecayMode) {
+    if (DecayMode.hasOwnProperty(mode)) {
+      const strMode = spaceBetweenCaps(mode), symbol = DecayMode[mode], desc = DecayModeDescription[mode];
+      if (desc) {
+        let inputNeutrons: HTMLInputElement, inputProtons: HTMLInputElement;
+
+        if (EnumDecayMode[mode] === EnumDecayMode.NeutronEmission) {
+          inputNeutrons = document.createElement('input');
+          inputNeutrons.type = 'number';
+          inputNeutrons.value = '1';
+          inputNeutrons.min = '1';
+          inputNeutrons.max = '999';
+          body.insertAdjacentHTML('beforeend', `<abbr title='Number of neutrons to emit'>Neutron Count</abbr>: `);
+          body.insertAdjacentElement('beforeend', inputNeutrons);
+        } else if (EnumDecayMode[mode] === EnumDecayMode.ClusterDecay) {
+          const spanCluster = document.createElement('span'), updateCluster = () => spanCluster.innerText = getAtomInfo(+inputProtons.value, +inputNeutrons.value).isotopeSymbol;
+
+          inputProtons = document.createElement('input');
+          inputProtons.type = 'number';
+          inputProtons.value = '1';
+          inputProtons.min = '1';
+          inputProtons.max = '999';
+          inputProtons.addEventListener('change', updateCluster);
+          body.insertAdjacentHTML('beforeend', `<abbr title='Number of protons in emitted cluster'>Protons</abbr>: `);
+          body.insertAdjacentElement('beforeend', inputProtons);
+
+          inputNeutrons = document.createElement('input');
+          inputNeutrons.type = 'number';
+          inputNeutrons.value = '0';
+          inputNeutrons.min = '0';
+          inputNeutrons.max = '999';
+          inputNeutrons.addEventListener('change', updateCluster);
+          body.insertAdjacentHTML('beforeend', `&nbsp; &nbsp; <abbr title='Number of neutrons in emitted cluster'>Neutrons</abbr>: `);
+          body.insertAdjacentElement('beforeend', inputNeutrons);
+
+          updateCluster();
+          body.insertAdjacentHTML('beforeend', `&nbsp; | <abbr title='Cluster we are ejecting'>Cluster</abbr>: `);
+          body.insertAdjacentElement('beforeend', spanCluster);
+        }
+        if (inputNeutrons || inputProtons) body.insertAdjacentHTML('beforeend', '<br>')
+
+        let btn = document.createElement('button');
+        btn.innerText = `${strMode} (${symbol})`;
+        btn.title = "Description: " + desc;
+        body.appendChild(btn);
+
+        btn.addEventListener('click', () => {
+          callback(EnumDecayMode[mode], inputNeutrons ? +inputNeutrons.value : undefined, inputProtons ? +inputProtons.value : undefined);
+        });
+
+        body.insertAdjacentHTML('beforeend', '<hr>');
+      }
+    }
+  }
+
 
   return { title: "Force Decay", body };
 }

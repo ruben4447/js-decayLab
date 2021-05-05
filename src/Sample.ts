@@ -2,7 +2,7 @@ import Atom from './Atom';
 import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString } from './utils';
 import SampleManager from './SampleManager';
 import DecayAnimation from './DecayAnimation';
-import { IAttemptedDecayInfo } from './InterfaceEnum';
+import { EnumDecayMode, IAttemptedDecayInfo } from './InterfaceEnum';
 
 type AtomDecayCallback = (atom: Atom, info: IAttemptedDecayInfo, time: number) => void;
 type AtomRemoveCallback = (atom: Atom) => void;
@@ -78,7 +78,7 @@ export class Sample {
   }
 
   /** Decay an atom. Return did it decay? */
-  atomDecay(atom: Atom, force: boolean = false) {
+  atomDecay(atom: Atom, force: boolean = false): boolean {
     if (force || probability(atom.decayChancePerSecond() * this._incTimeAmount)) {
       if (atom.get<boolean>('isStable') === false) {
         let info = atom.decay();
@@ -92,6 +92,18 @@ export class Sample {
       }
     }
     return false;
+  }
+
+  /** Decay an atom as per stated */
+  forcedAtomDecay(atom: Atom, mode: EnumDecayMode, neutrons?: number, protons?: number): boolean {
+    let info = atom.forceDecay(mode, neutrons, protons);
+    if (info) {
+      if (info.success) this._animations.push(new DecayAnimation(atom, info)); // Push decay animation
+      if (typeof this._callbackAtomDecay === 'function') this._callbackAtomDecay(atom, info, this._time);
+      return info.success;
+    } else {
+      return false;
+    }
   }
 
   getTime() { return this._time; }
@@ -134,8 +146,7 @@ export class Sample {
     this._atoms.forEach(atom => {
       let initial = atom.getHistory()[0];
       if (typeof initial == 'string' && initial !== atom.getIsotopeSymbol()) {
-        let [protons, neutrons] = getNeutronsProtonsFromIsotopeString(initial);
-        atom.set(protons, neutrons);
+        atom.setString(initial);
         atom.resetHistory();
       }
     });

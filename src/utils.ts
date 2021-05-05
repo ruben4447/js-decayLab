@@ -1,6 +1,5 @@
-import { DecayModes } from "./Atom";
 import elementData from "../data/elements.json";
-import { createAnalysisResultObject, IAnalyseStringComponent, IAnalysisResult, IDecayInfo, IIsotopeInfo, IIUPACNameSymbol, ITimeObject } from "./InterfaceEnum";
+import { createAnalysisResultObject, DecayMode, EnumDecayMode, IAnalyseStringComponent, IAnalysisResult, IDecayInfo, IIsotopeInfo, IIUPACNameSymbol, ITimeObject } from "./InterfaceEnum";
 
 export function rgbStringify(array: number[]) {
   if (array.length === 1) return `rgb(${array[0]}, ${array[0]}, ${array[0]})`;
@@ -100,10 +99,12 @@ export const createLink = (html?: string) => {
 
 export const capitaliseString = (string: string) => string[0].toUpperCase() + string.substr(1).toLowerCase();
 
+/** e.g. "HelloWorld" --> "Hello World" */
+export const spaceBetweenCaps = (str: string): string => str.replace(/(?<=[a-z])(?=[A-Z])/g, ' ');
+
 /** Basically, replace "null" or "undefined" with "?" for nice display */
 export const nicifyNull = (string: string) => string == undefined || string == null ? "<span class='null'>?</span>" : string;
 
-export const RADIOACTIVE_SYMBOL_HTML = '&#9762;';
 export const RADIOACTIVE_SYMBOL = '☢';
 export const INFO_SYMBOL = 'ⓘ';
 
@@ -125,37 +126,22 @@ export function getSuitableFontSize(text: string, fontFamily: string, max: numbe
   return fontSize
 }
 
-export function decayModeToString(symbol: string) {
-  if (symbol.match(DecayModes.Alpha)) return "alpha";
-  if (symbol.match(DecayModes.BetaMinus)) return "beta-minus";
-  if (symbol.match(DecayModes.BetaPlus)) return "beta-plus";
-  if (symbol.match(DecayModes.NeutronEmission)) return "neutron emission";
-  if (symbol.match(DecayModes.SpontaneousFission)) return "spontaneous fission";
-  if (symbol.match(DecayModes.ElectronCapture)) return "electron capture";
-  if (symbol.match(DecayModes.NuclearIsomer)) return "electron capture";
-  if (symbol.match(DecayModes.ClusterDecay)) return "cluster decay";
-  return "<unknown>";
+export function decaySymbolToEnumValue(symbol: string): EnumDecayMode | null {
+  if (symbol.match(DecayMode.Alpha)) return EnumDecayMode.Alpha;
+  if (symbol.match(DecayMode.BetaMinus)) return EnumDecayMode.BetaMinus;
+  if (symbol.match(DecayMode.BetaPlus)) return EnumDecayMode.BetaPlus;
+  if (symbol.match(DecayMode.NeutronEmission)) return EnumDecayMode.NeutronEmission;
+  if (symbol.match(DecayMode.SpontaneousFission)) return EnumDecayMode.SpontaneousFission;
+  if (symbol.match(DecayMode.ElectronCapture)) return EnumDecayMode.ElectronCapture;
+  if (symbol.match(DecayMode.NuclearIsomer)) return EnumDecayMode.NuclearIsomer;
+  if (symbol.match(DecayMode.ClusterDecay)) return EnumDecayMode.ClusterDecay;
+  return null;
 }
 
 export function isotopeInfoFromString(string: string): IIsotopeInfo {
   let [symbol, mass] = string.split('-');
   if (!elementData.symbol_map.hasOwnProperty(symbol)) throw new Error(`Invalid symbol "${symbol}" (isotope string "${string}}")`);
   return { name: elementData.symbol_map[symbol], mass: +mass };
-}
-
-/** From an isitope string, returns [protons, neutrons] */
-export function getNeutronsProtonsFromIsotopeString(isotope: string): number[] {
-  const { name } = isotopeInfoFromString(isotope);
-
-  let data = elementData[name];
-  if (data.isotopes[isotope]) {
-    return [
-      data.isotopes[isotope].Z,
-      data.isotopes[isotope].N
-    ];
-  } else {
-    throw new Error(`Unknown isotope of ${data.name} : "${isotope}"`);
-  }
 }
 
 /**
@@ -185,10 +171,11 @@ export function removeChildren(el: HTMLElement) {
 const _IUPACNameParts = ["nil", "un", "bi", "tri", "quad", "pent", "hex", "sept", "oct", "enn"];
 
 /** get IUAPC name/symbol from atomic number */
-function getIUPACNameSymbol(atomicNumber: number): IIUPACNameSymbol {
+export function getIUPACNameSymbol(atomicNumber: number): IIUPACNameSymbol {
   let name = "", symbol = "", number = atomicNumber.toString();
   for (let i = 0; i < number.length; i++) {
     let part = _IUPACNameParts[+number[i]];
+    if (part == undefined) throw new Error(`getIUPACNameSymbol: cannot find for number '${number}': cannot find part for '${number[i]}'`);
     name += part;
     symbol += part[0];
   }
@@ -254,7 +241,7 @@ export function analyseElementName(name: string): IAnalyseStringComponent | null
     obj.IUPACName = ipuac.name;
     obj.IUPACSymbol = ipuac.symbol;
   } else {
-    let name = lname.replace("ium", ""), symbol = "", atomicNumberStr = "";
+    let hasIum = !!(lname.match("ium")), name = lname.replace("ium", ""), symbol = "", atomicNumberStr = "";
     for (let i = 0; i < name.length;) {
       let ok = false;
       for (let pi = 0; pi < _IUPACNameParts.length; pi++) {
@@ -268,6 +255,7 @@ export function analyseElementName(name: string): IAnalyseStringComponent | null
       }
       if (!ok) return null;
     }
+    if (!hasIum) return null; // All IUPAC names have '-ium'
     obj.IUPACName = capitaliseString(lname);
     obj.IUPACSymbol = capitaliseString(symbol);
     obj.protons = parseInt(atomicNumberStr);
@@ -361,9 +349,16 @@ export function analyseString(str: string): IAnalysisResult | null {
   }
 
   if (obj.name) {
-    let data = elementData[obj.name.toLowerCase()];
-    if (data) {
-      obj.exists = data.isotopes[obj.isotopeSymbol] != undefined;
+    const elData = elementData[obj.name.toLowerCase()];
+    if (elData) {
+      const isoData = elData.isotopes[obj.isotopeSymbol];
+      if (isoData) {
+        obj.exists = true;
+        obj.halflife = isoData.halflife;
+        obj.isStable = isoData.is_stable;
+      } else {
+        obj.exists = false;
+      }
     } else {
       obj.exists = false;
     }
@@ -434,7 +429,6 @@ export function hslToRgb(h: number, s: number, l: number) {
   b = Math.round((b + m) * 255);
   return [r, g, b];
 }
-
 export const randomHSBColour = (): number[] => hslToRgb(randomInt(0, 359), 100, 50);
 
 /** Get best foreground/background colour depending on colour */
