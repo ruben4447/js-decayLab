@@ -34,6 +34,9 @@ async function main() {
       console.log(`%c⨯ [${time} s] decay failed: ${atom.getIsotopeSymbol()} -> (${info.mode}) -> ${info.daughter}`, 'color:tomato;');
     }
   });
+  sample.onAtomRemove(atom => {
+    console.log(`Removed atom ${atom.getIsotopeSymbol()}`);
+  });
 
   const manager = new SampleManager(wrapper);
   manager.width = 800;

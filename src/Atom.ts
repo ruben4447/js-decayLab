@@ -2,7 +2,7 @@ import elementData from '../data/elements.json';
 import categoryColours from '../data/categories.json';
 import SampleManager from './SampleManager';
 import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, getNeutronsProtonsFromIsotopeString, probability, analyseString, getAtomInfo } from './utils';
-import { IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, LegendOptionValues } from './InterfaceEnum';
+import { EnumDecayModes, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, IDecayModes, LegendOptionValues } from './InterfaceEnum';
 
 globalThis.elementData = elementData;
 const HIGHLIGHT_COLOUR = rgbStringify([255, 50, 250]);
@@ -203,15 +203,39 @@ export default class Atom {
 
   /** Return duplicate of self */
   clone() { return new Atom(this._data.protons, this._data.neutrons); }
-}
 
-export const DecayModes = {
-  Alpha: 'α',
-  BetaMinus: 'β−',
-  BetaPlus: 'β+',
-  NeutronEmission: 'n',
-  SpontaneousFission: "SF",
-  ElectronCapture: "EC",
-  NuclearIsomer: "IT",
-  ClusterDecay: "CD",
-};
+  /** Force a decay */
+  forceDecay(mode: EnumDecayModes) {
+    let Δp = 0, Δn = 0;
+    switch (mode) {
+      case EnumDecayModes.Alpha:
+        // Eject helium-4 nucleus (aka. alpha particle)
+        Δp = -2;
+        Δn = -2;
+        break;
+      case EnumDecayModes.BetaMinus:
+        // Eject electron and antineutrino - neutron to proton
+        Δp = 1;
+        Δn = -1;
+        break;
+      case EnumDecayModes.BetaPlus:
+        // Eject positron and neutrino - proton to neutron
+        Δp = -1;
+        Δn = 1;
+        break;
+      case EnumDecayModes.NeutronEmission:
+        // Eject 1 or more neutrons
+        Δn = -1;
+        break;
+      case EnumDecayModes.ElectronCapture:
+        // Nuclear captures an orbiting electron, converting a proton to convert into a neutron
+        Δp = -1;
+        Δn = 1;
+        break;
+      default:
+        throw new TypeError(`Unknown or unsupported decay mode: "${mode}"`);
+    }
+
+    this.set(this._data.protons + Δp, this._data.neutrons + Δn);
+  }
+}

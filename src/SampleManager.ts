@@ -147,6 +147,17 @@ export default class SampleManager {
     }
   }
 
+  /** Prepare to begin simulation */
+  prepareForSimulation() {
+    // Remove all theoretical atoms
+    const self = this;
+    this._sample.forEachAtom(atom => {
+      if (!atom.get<boolean>('exists')) {
+        self._sample.removeAtom(atom);
+      }
+    });
+  }
+
   private _addEvents() {
     const self = this;
 
@@ -489,6 +500,7 @@ export default class SampleManager {
       if (onclickStart) {
         onclickStart = false;
         btnToggle.innerText = 'Pause';
+        this.prepareForSimulation();
         this._sample.startSimulation();
         timeInput.setAttribute('disabled', 'disabled');
         btnStep.setAttribute('hidden', 'hidden');
@@ -508,7 +520,10 @@ export default class SampleManager {
 
     let btnStep = document.createElement('button');
     btnStep.innerText = 'Step';
-    btnStep.addEventListener('click', () => this._sample.simulationStep());
+    btnStep.addEventListener('click', () => {
+      this.prepareForSimulation();
+      this._sample.simulationStep();
+    });
     fieldset.appendChild(btnStep);
 
     let btnReset = document.createElement('button');

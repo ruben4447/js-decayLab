@@ -124,3 +124,19 @@ export interface IAnalyseStringComponent {
 export interface IIUPACNameSymbol {
     name: string, symbol: string,
 }
+
+/** Decay modes (values of each in atom.ts/DecayModes) */
+export const DecayModes = {
+    Alpha: 'α',
+    BetaMinus: 'β−',
+    BetaPlus: 'β+',
+    NeutronEmission: 'n',
+    SpontaneousFission: "SF",
+    ElectronCapture: "EC",
+    NuclearIsomer: "IT",
+    ClusterDecay: "CD",
+};
+
+export enum EnumDecayModes {
+    Alpha, BetaMinus, BetaPlus, NeutronEmission, SpontaneousFission, ElectronCapture, NuclearIsomer, ClusterDecay
+}

@@ -5,6 +5,7 @@ import DecayAnimation from './DecayAnimation';
 import { IAttemptedDecayInfo } from './InterfaceEnum';
 
 type AtomDecayCallback = (atom: Atom, info: IAttemptedDecayInfo, time: number) => void;
+type AtomRemoveCallback = (atom: Atom) => void;
 
 export class Sample {
   private _animations: DecayAnimation[] = [];
@@ -14,6 +15,7 @@ export class Sample {
   private _loopIntervalID = NaN;
 
   private _callbackAtomDecay: AtomDecayCallback;
+  private _callbackAtomRemove: AtomRemoveCallback;
 
   constructor() { }
 
@@ -53,8 +55,16 @@ export class Sample {
     this._atoms.push(atom);
   }
 
+  /** Set callback for when an atom is removed */
+  onAtomRemove(callback: AtomRemoveCallback) {
+    this._callbackAtomRemove = callback;
+    return this;
+  }
+
   removeAtom(atom: Atom) {
-    return arrayRemove(this._atoms, atom);
+    const success = arrayRemove(this._atoms, atom);
+    if (success && typeof this._callbackAtomRemove) this._callbackAtomRemove(atom);
+    return success;
   }
 
   removeAllAtoms() {
@@ -101,7 +111,7 @@ export class Sample {
   /** Called internally in interval initiated by this.startSimulation() */
   simulationStep() {
     let atoms = [...this._atoms]; // Atoms to evaluate
-    for (let i = 0, atom; i < atoms.length; i++) {
+    for (let i = 0, atom: Atom; i < atoms.length; i++) {
       atom = atoms[i];
       let decayed = this.atomDecay(atom, false);
       if (decayed) {
