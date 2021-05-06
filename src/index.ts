@@ -6,11 +6,7 @@ import globals from './globals';
 import { arrFromBack, randomChoice } from './utils';
 import { DecayMode, EnumDecayMode, LegendOptionValues, RenderMode } from './InterfaceEnum';
 
-import * as utils from './utils';
-globalThis.utils = utils;
-
 var wrapper: HTMLElement;
-globalThis.EnumDecayModes = EnumDecayMode;
 
 async function main() {
   wrapper = document.getElementById('wrapper');
@@ -50,11 +46,12 @@ async function main() {
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
   manager.sampleConfig.legend = LegendOptionValues.Radioactive;
   manager.sampleConfig.manualOverride = true;
+  manager.sampleConfig.bindSpacebar = true;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();
 
-  let atom = new Atom("U-236");
+  let atom = new Atom("U-236m17");
   manager.addAtomToSample(atom);
   globals.atom = atom;
 

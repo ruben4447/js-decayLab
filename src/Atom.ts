@@ -1,10 +1,9 @@
 import elementData from '../data/elements.json';
 import categoryColours from '../data/categories.json';
 import SampleManager from './SampleManager';
-import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, getNeutronsProtonsFromIsotopeString, probability, analyseString, getAtomInfo, decaySymbolToEnumValue } from './utils';
-import { EnumDecayMode, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, IDecayModes, LegendOptionValues } from './InterfaceEnum';
+import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, probability, analyseString, getAtomInfo, decaySymbolToEnumValue } from './utils';
+import { EnumDecayMode, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, LegendOptionValues } from './InterfaceEnum';
 
-globalThis.elementData = elementData;
 const HIGHLIGHT_COLOUR = rgbStringify([255, 50, 250]);
 
 elementData.symbol_map = {};

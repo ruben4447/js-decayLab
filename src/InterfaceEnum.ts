@@ -95,8 +95,8 @@ export interface IAnalysisResult {
     protons: number;
     neutrons: number;
     isotopeSymbol: string; // Isotope symbol e.g. "U-235"
-    isotopicIsomerNumber?: number; // Number after 'm' e.g. "In-119m2"
-    isotopicIsomerParent?: string; // If isotopicIsomerNumber is !NaN, then contains parent e.g. parent of "In-119m2" is "In-119"
+    metastableIsotopeNumber?: number; // Number after 'm' e.g. "In-119m2"
+    metastableIsotopeParent?: string; // If isotopicIsomerNumber is !NaN, then contains parent e.g. parent of "In-119m2" is "In-119"
     IUPACName: string;
     IUPACSymbol: string;
     isStable: boolean; // If isotope does not exist, make estimate

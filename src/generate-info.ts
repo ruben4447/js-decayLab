@@ -1,6 +1,6 @@
 import Atom from './Atom';
 import Popup from './Popup';
-import { numberWithCommas, secondsToAppropriateTime, createLink, capitaliseString, nicifyNull, RADIOACTIVE_SYMBOL, decaySymbolToEnumValue, getIsotopeDecayInfo, round, analyseString, INFO_SYMBOL, analyseElementName, getAtomInfo, spaceBetweenCaps } from './utils';
+import { numberWithCommas, secondsToAppropriateTime, createLink, capitaliseString, nicifyNull, RADIOACTIVE_SYMBOL, decaySymbolToEnumValue, getIsotopeDecayInfo, round, analyseString, INFO_SYMBOL, analyseElementName, getAtomInfo, spaceBetweenCaps, randomInt } from './utils';
 import elementData from '../data/elements.json';
 import ptableData from '../data/ptable.json';
 import globals from './globals';
@@ -32,6 +32,7 @@ export function generateAtomInfo(string: string): IGeneratedInfo {
   table.insertAdjacentHTML('beforeend', `<tr><th>Protons</th><td>${data.protons}</td></tr>`);
   table.insertAdjacentHTML('beforeend', `<tr><th>Neutrons</th><td>${data.neutrons}</td></tr>`);
 
+  // What element are we?
   let tr = document.createElement('tr'), th = document.createElement('th');
   table.appendChild(tr);
   tr.appendChild(th);
@@ -47,6 +48,11 @@ export function generateAtomInfo(string: string): IGeneratedInfo {
     popup.show();
   });
 
+  // Metastable?
+  if (!isNaN(data.metastableIsotopeNumber)) {
+    table.insertAdjacentHTML('beforeend', `<tr><th><a href='https://en.wikipedia.org/wiki/Nuclear_isomer' target='_blank'>Metastable Isomer</a> No.</th><td>${data.metastableIsotopeNumber}</td></tr>`);
+    table.insertAdjacentHTML('beforeend', `<tr><th>Non-metastable State</th><td>${data.metastableIsotopeParent}</td></tr>`);
+  }
 
   if (data.isStable === true) {
     table.insertAdjacentHTML('beforeend', `<tr><th>Halflife</th><td><em>Stable</em></td></tr>`);
@@ -336,18 +342,6 @@ export function generatePeriodicTable(clickElementCallback: (name: string) => vo
     }
   }
 
-  if (globals.manager.sampleConfig.manualOverride) {
-    // Custom Isotope
-    body.insertAdjacentHTML("beforeend", "<br>");
-    let btn = document.createElement('button');
-    btn.innerText = 'Custom Isotope';
-    btn.addEventListener('click', () => {
-      const { title, body } = generateCustomIsotopePopup(data => console.log(data));
-      new Popup(title).insertAdjacentElement('beforeend', body).show();
-    });
-    body.insertAdjacentElement('beforeend', btn);
-  }
-
   return { title: 'Periodic Table of the Elements', body, };
 }
 
@@ -362,16 +356,6 @@ export function generatePTablePlaque(atomic_number: number): HTMLDivElement {
   div.innerHTML += `<span class='${CLASS_NAME}-symbol'>${data.symbol}</span>`;
   // div.innerHTML += `<span class='${CLASS_NAME}-name'>${data.name}</span>`;
   return div;
-}
-
-export function generateCustomIsotopePopup(callback: (data: IAnalysisResult) => void): IGeneratedInfo {
-  const body = document.createElement('div');
-  body.classList.add('generate-isotope');
-
-  // TODO: Implement this :)
-  body.insertAdjacentHTML('beforeend', `<em>Not Implemented</em>`);
-
-  return { title: "Custom Isotope", body };
 }
 
 export function generateEditProtonNeutronCount(protons: number, neutrons: number, callback: (protons: number, neutrons: number) => void): IGeneratedInfo {
@@ -583,4 +567,109 @@ export function generateForceDecayInterface(callback: ForceDecayCallback): IGene
 
 
   return { title: "Force Decay", body };
+}
+
+export function generateInsertPopup(custom: boolean, callback: (string: string) => void): IGeneratedInfo {
+  const body = document.createElement("div");
+  body.classList.add('insert-isotope');
+
+  const populateSelectIsotope = () => {
+    const element = selectElement.value, obj = elementData[element];
+    while (selectIsotope.children.length !== 0) selectIsotope.removeChild(selectIsotope.children[0]);
+    if (obj) {
+      for (let isotope in obj.isotopes) {
+        if (obj.isotopes.hasOwnProperty(isotope)) {
+          let content = isotope;
+          if (!obj.isotopes[isotope].is_stable) content += ' ' + RADIOACTIVE_SYMBOL;
+          selectIsotope.insertAdjacentHTML('beforeend', `<option value='${isotope}'>${content}</option>`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Default insert:
+   * 1) Select element
+   * 2) Select isotope
+   */
+  let p = document.createElement("p");
+  body.appendChild(p);
+  p.insertAdjacentText('beforeend', 'Insert isotope ');
+  let selectIsotope = document.createElement("select");
+  p.insertAdjacentElement('beforeend', selectIsotope);
+
+  p.insertAdjacentText('beforeend', ' of element ');
+  let selectElement = document.createElement("select");
+  for (let element of elementData.order) {
+    selectElement.insertAdjacentHTML('beforeend', `<option value='${element}'>${elementData[element].name}</option>`);
+  }
+  selectElement.addEventListener('change', () => populateSelectIsotope());
+  p.insertAdjacentElement('beforeend', selectElement);
+
+  let btnDefaultInsert = document.createElement('button');
+  btnDefaultInsert.innerText = 'Insert Isotope';
+  btnDefaultInsert.addEventListener('click', () => {
+    if (selectIsotope.value.length !== 0) {
+      callback(selectIsotope.value);
+    }
+  });
+  body.appendChild(btnDefaultInsert);
+
+  if (custom) {
+    /**
+     * Manual Override: custom isotopes
+     * Option 1 - enter protons / neutrons in isotope
+     * Option 2 - type in isotope
+    */
+    body.insertAdjacentHTML('beforeend', '<br><hr>');
+    let p = document.createElement('p');
+    body.appendChild(p);
+
+    p.insertAdjacentText('beforeend', 'Isotope with ')
+    let inputProtons = document.createElement('input');
+    inputProtons.type = 'number';
+    inputProtons.min = '1';
+    inputProtons.max = '999';
+    p.appendChild(inputProtons);
+    p.insertAdjacentText('beforeend', ' protons, ');
+    let inputNeutrons = document.createElement("input");
+    inputNeutrons.type = 'number';
+    inputNeutrons.min = '0';
+    inputNeutrons.max = '9999';
+    p.appendChild(inputNeutrons);
+    p.insertAdjacentText('beforeend', ' neutrons');
+
+    let btnPNInsert = document.createElement('button');
+    btnPNInsert.innerText = 'Insert Isotope';
+    btnPNInsert.addEventListener('click', () => {
+      const p = +inputProtons.value, n = +inputNeutrons.value;
+      if (p < +inputProtons.min || n < +inputNeutrons.min) {
+        new Popup("Invalid Isotope").insertAdjacentText('beforeend', `Protons must be >= ${inputProtons.min}. Neutrons must be >= ${inputNeutrons.min}`).show();
+      } else {
+        let info = getAtomInfo(+(inputProtons.value), +(inputNeutrons.value));
+        callback(info.isotopeSymbol);
+      }
+    });
+    body.appendChild(btnPNInsert);
+    body.insertAdjacentHTML('beforeend', '<br><hr>');
+
+    p = document.createElement('p');
+    body.appendChild(p);
+    p.insertAdjacentText('beforeend', 'Insert isotope ');
+    let inputIsotope = document.createElement('input');
+    inputIsotope.type = "text";
+    inputIsotope.placeholder = "U-238";
+    p.appendChild(inputIsotope);
+    let btnInsertIsotope = document.createElement('button');
+    btnInsertIsotope.innerText = "Insert Isotope";
+    btnInsertIsotope.addEventListener('click', () => {
+      if (inputIsotope.value.length !== 0) {
+        callback(inputIsotope.value);
+      }
+    });
+    body.appendChild(btnInsertIsotope);
+  }
+
+  populateSelectIsotope();
+  return { title: 'Insert Isotope', body };
 }

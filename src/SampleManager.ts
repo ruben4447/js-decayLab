@@ -1,7 +1,7 @@
 import type Sample from './Sample';
 import { bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
-import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateEditProtonNeutronCount, generateElementInfo, generateForceDecayInterface, generateFullLegend, generatePeriodicTable } from './generate-info';
+import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateEditProtonNeutronCount, generateElementInfo, generateForceDecayInterface, generateFullLegend, generateInsertPopup, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
 import Piechart from './Piechart';
 import { createSampleConfigObject, EnumDecayMode, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
@@ -21,6 +21,7 @@ export default class SampleManager {
   private _legendData: { [item: string]: ILegendItem } = {}; // Data for legend
   private _chart: Piechart; // For containing chart in rendering
   private _chartLabelOver: string; // Label of section we are over
+  private _btnToggleSimulation: HTMLButtonElement; // Button to start/stop the simulation
   public readonly sampleConfig = createSampleConfigObject();
 
   constructor(wrapper: HTMLElement) {
@@ -217,15 +218,8 @@ export default class SampleManager {
       if (Popup.popupsOpen() === 0 && self.sampleConfig.interactive) {
         if (event.key == ' ' && self.sampleConfig.bindSpacebar) {
           /// TOGGLE SIMULATION
-          // TODO: upgrade to change GUI as well
-          if (self._sample.isSimulationRunning()) {
-            self._sample.stopSimulation();
-            console.log("Simulation: stopping");
-          } else {
-            self.prepareForSimulation();
-            self._sample.startSimulation();
-            console.log("Simulation: starting");
-          }
+          console.log("Spacebar: simulation " + (self._sample.isSimulationRunning() ? "stopping" : "starting"));
+          this._btnToggleSimulation.click();
         }
 
         /// RenderMode=Atoms
@@ -348,10 +342,10 @@ export default class SampleManager {
     body.insertAdjacentHTML('beforeend', `<abbr title='Width of canvas; initial = ${this.width} px'>Width </abbr> `);
     let rangeWidth = document.createElement('input');
     rangeWidth.type = 'range';
-    rangeWidth.value = this.width.toString();
     rangeWidth.min = "100";
     rangeWidth.step = "10";
     rangeWidth.max = window.screen.width.toString();
+    rangeWidth.value = this.width.toString();
     rangeWidth.addEventListener('input', () => {
       let value = parseInt(rangeWidth.value);
       this.width = value;
@@ -366,10 +360,10 @@ export default class SampleManager {
     body.insertAdjacentHTML('beforeend', `<br><abbr title='Height of canvas; initial = ${this.height} px'>Height </abbr> `);
     let rangeHeight = document.createElement('input');
     rangeHeight.type = 'range';
-    rangeHeight.value = this.height.toString();
     rangeHeight.min = "100";
     rangeHeight.step = "10";
     rangeHeight.max = window.screen.height.toString();
+    rangeHeight.value = this.height.toString();
     rangeHeight.addEventListener('input', () => {
       let value = parseInt(rangeHeight.value);
       this.height = value;
@@ -477,8 +471,31 @@ export default class SampleManager {
   deployHTML(container: HTMLElement, legendContainer: HTMLElement) {
     this._legendContainer = legendContainer;
     let fieldset = document.createElement('fieldset');
+    fieldset.id = 'simulation-controls';
     container.appendChild(fieldset);
-    // fieldset.insertAdjacentHTML('beforeend', '<legend>Controls</legend>');
+
+    let btnInsert = document.createElement('button');
+    btnInsert.innerText = 'Insert';
+    btnInsert.addEventListener('click', () => {
+      const fail = (string: string) => new Popup("Unable to Insert Isotope").insertAdjacentText('beforeend', `Unable to add '${string}' to sample. Make sure that the simulation is not running.`).show();
+
+      const { title, body } = generateInsertPopup(this.sampleConfig.manualOverride, (string) => {
+        try {
+          const atom = new Atom(string);
+          let added = globals.manager.addAtomToSample(atom);
+          if (added) {
+            popupInsert.hide();
+          } else {
+            fail(string);
+          }
+        } catch (err) {
+          console.error(err);
+          fail(string);
+        }
+      });
+      const popupInsert = new Popup(title).insertAdjacentElement('beforeend', body).show();
+    });
+    fieldset.appendChild(btnInsert);
 
     let btnPtable = document.createElement('button');
     btnPtable.innerText = 'Periodic Table';
@@ -535,6 +552,7 @@ export default class SampleManager {
     fieldset.appendChild(p);
 
     let btnToggle = document.createElement('button'), onclickStart = true;
+    this._btnToggleSimulation = btnToggle;
     btnToggle.innerText = 'Start';
     btnToggle.addEventListener('click', () => {
       if (onclickStart) {
@@ -543,20 +561,24 @@ export default class SampleManager {
         this.prepareForSimulation();
         this._sample.startSimulation();
         timeInput.setAttribute('disabled', 'disabled');
-        btnStep.setAttribute('hidden', 'hidden');
-        btnReset.setAttribute('hidden', 'hidden');
+        spanOtherButtons.setAttribute('hidden', 'hidden');
         timeUnitSelect.setAttribute('disabled', 'disabled');
+        fieldset.dataset.running = "true";
       } else {
         onclickStart = true;
         btnToggle.innerText = 'Start';
         this._sample.stopSimulation();
         timeInput.removeAttribute('disabled');
-        btnStep.removeAttribute('hidden');
-        btnReset.removeAttribute('hidden');
+        spanOtherButtons.removeAttribute('hidden');
         timeUnitSelect.removeAttribute('disabled');
+        fieldset.dataset.running = "false";
       }
     });
     fieldset.appendChild(btnToggle);
+
+    // Other buttons
+    let spanOtherButtons = document.createElement('span');
+    fieldset.appendChild(spanOtherButtons);
 
     let btnStep = document.createElement('button');
     btnStep.innerText = 'Step';
@@ -564,7 +586,7 @@ export default class SampleManager {
       this.prepareForSimulation();
       this._sample.simulationStep();
     });
-    fieldset.appendChild(btnStep);
+    spanOtherButtons.appendChild(btnStep);
 
     let btnReset = document.createElement('button');
     btnReset.innerText = 'Reset';
@@ -572,7 +594,7 @@ export default class SampleManager {
       this._sample.resetSimulation();
       this.updateLegend();
     });
-    fieldset.appendChild(btnReset);
+    spanOtherButtons.appendChild(btnReset);
 
     let btnClear = document.createElement('button');
     btnClear.innerText = 'Clear';
@@ -581,7 +603,7 @@ export default class SampleManager {
       this._sample.removeAllAtoms();
       this.updateLegend();
     });
-    fieldset.appendChild(btnClear);
+    spanOtherButtons.appendChild(btnClear);
   }
 
   /** Setup legend inside element */

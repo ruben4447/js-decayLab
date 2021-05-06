@@ -9,9 +9,4 @@
 
 - Halflife estimator of current sample
 
-- Manual Override [IN PROGRESS]
-  - Force decay [DONE]
-  - Insert custom isotope (both by string and by number)
-  - Edit proton/neutron count [DONE]
-
 - Finish estimating stability of any isotope

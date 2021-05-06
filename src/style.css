@@ -11,6 +11,12 @@ canvas {
   font-size: 1.2em;
 }
 
+#simulation-controls[data-running="true"] {
+  border: 2px solid forestgreen;
+  outline: 1px solid lightgreen;
+  background: rgba(186, 255, 186, .2);
+}
+
 .popup-bg {
   position: fixed;
   top: 0;

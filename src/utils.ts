@@ -305,7 +305,7 @@ export function analyseString(str: string): IAnalysisResult | null {
     if (mass.indexOf('m') !== -1) {
       let [_, n] = mass.split('m');
       if (n.length === 0) n = '0'; // Default one
-      obj.isotopicIsomerNumber = parseInt(n);
+      obj.metastableIsotopeNumber = parseInt(n);
     }
   }
 
@@ -341,10 +341,10 @@ export function analyseString(str: string): IAnalysisResult | null {
   // Get isotope symbol
   if (!isNaN(obj.neutrons)) {
     obj.isotopeSymbol = `${obj.symbol || obj.IUPACSymbol}-${obj.neutrons + obj.protons}`;
-    if (obj.isotopicIsomerNumber != undefined) {
-      obj.isotopicIsomerParent = obj.isotopeSymbol; // Parent isotope (without 'm')
+    if (obj.metastableIsotopeNumber != undefined) {
+      obj.metastableIsotopeParent = obj.isotopeSymbol; // Parent isotope (without 'm')
       obj.isotopeSymbol += 'm';
-      if (obj.isotopicIsomerNumber !== 0) obj.isotopeSymbol += obj.isotopicIsomerNumber.toString();
+      if (obj.metastableIsotopeNumber !== 0) obj.isotopeSymbol += obj.metastableIsotopeNumber.toString();
     }
   }
 
