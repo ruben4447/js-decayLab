@@ -1,10 +1,10 @@
 import type Sample from './Sample';
-import { bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
+import { analyseString, bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
 import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateEditProtonNeutronCount, generateElementInfo, generateForceDecayInterface, generateFullLegend, generateInsertPopup, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
 import Piechart from './Piechart';
-import { createSampleConfigObject, EnumDecayMode, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
+import { AtomType, createSampleConfigObject, EnumDecayMode, ILegendItem, LegendOptionValues, RenderMode } from './InterfaceEnum';
 import globals from './globals';
 
 export default class SampleManager {
@@ -23,6 +23,8 @@ export default class SampleManager {
   private _chartLabelOver: string; // Label of section we are over
   private _btnToggleSimulation: HTMLButtonElement; // Button to start/stop the simulation
   public readonly sampleConfig = createSampleConfigObject();
+  private _mainAtomType: AtomType;
+  private _mainAtom: string;
 
   constructor(wrapper: HTMLElement) {
     this._sample = undefined;
@@ -33,6 +35,27 @@ export default class SampleManager {
     this._removeEventsFn = this._addEvents();
     this._chart = new Piechart(this._canvas);
     this._chart.setPos(this._canvas.width / 2, this._canvas.height / 2);
+  }
+
+  setMainAtom(str: string, type?: AtomType): boolean {
+    let ok: boolean;
+    if (type !== undefined) this._mainAtomType = type;
+    try { 
+      let info = analyseString(str);
+      this._mainAtom = this._mainAtomType == 'element' ? info.name || info.IUPACName : info.isotopeSymbol;
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    if (this.sampleConfig.legend === LegendOptionValues.Main) this.updateLegend();
+    return ok;
+  }
+
+  getMainAtom() {
+    return {
+      type: this._mainAtomType,
+      value: this._mainAtom,
+    };
   }
 
   destroy() {
@@ -469,6 +492,7 @@ export default class SampleManager {
   }
 
   deployHTML(container: HTMLElement, legendContainer: HTMLElement) {
+    let p: HTMLParagraphElement;
     this._legendContainer = legendContainer;
     let fieldset = document.createElement('fieldset');
     fieldset.id = 'simulation-controls';
@@ -479,14 +503,17 @@ export default class SampleManager {
     btnInsert.addEventListener('click', () => {
       const fail = (string: string) => new Popup("Unable to Insert Isotope").insertAdjacentText('beforeend', `Unable to add '${string}' to sample. Make sure that the simulation is not running.`).show();
 
-      const { title, body } = generateInsertPopup(this.sampleConfig.manualOverride, (string) => {
+      const { title, body } = generateInsertPopup(this.sampleConfig.manualOverride, (string, count) => {
+        if (isNaN(count) || count < 1) return new Popup("Invalid Number").insertAdjacentText('beforeend', `Invalid isotope count '${count}'; must be an integer greater than 0`).show();
         try {
-          const atom = new Atom(string);
-          let added = globals.manager.addAtomToSample(atom);
-          if (added) {
-            popupInsert.hide();
-          } else {
-            fail(string);
+          for (let i = 0; i < count; i++) {
+            const atom = new Atom(string);
+            let added = globals.manager.addAtomToSample(atom);
+            if (added) {
+              popupInsert.hide();
+            } else {
+              fail(string);
+            }
           }
         } catch (err) {
           console.error(err);
@@ -517,7 +544,41 @@ export default class SampleManager {
     btnOptions.addEventListener('click', () => this._optionsPopup.show());
     fieldset.appendChild(btnOptions);
 
-    let timeSpan = document.createElement('span'), p = document.createElement('p');
+    // MAIN
+    p = document.createElement("p");
+    fieldset.appendChild(p);
+    p.insertAdjacentHTML('beforeend', `Main `);
+    let selectMainType = document.createElement("select");
+    selectMainType.insertAdjacentHTML('beforeend', `<option value='element'>Element</option>`);
+    selectMainType.insertAdjacentHTML('beforeend', `<option value='isotope'>Isotope</option>`);
+    selectMainType.addEventListener('change', () => {
+      let type = selectMainType.value as AtomType;
+      let ok = this.setMainAtom(inputMain.value, type);
+      if (!ok) {
+        new Popup("Invalid Atom").insertAdjacentText('beforeend', `Invalid atom string '${inputMain.value}'`).show();
+      }
+      inputMain.value = this._mainAtom;
+    });
+    this._mainAtomType = 'element';
+    p.appendChild(selectMainType);
+    p.insertAdjacentHTML('beforeend', ` &equals; `);
+    let inputMain = document.createElement("input");
+    inputMain.type = "text";
+    this._mainAtom = 'Uranium';
+    this.updateLegend();
+    inputMain.value = this._mainAtom;
+    inputMain.addEventListener('change', () => {
+      let ok = this.setMainAtom(inputMain.value);
+      if (!ok) {
+        new Popup("Invalid Atom").insertAdjacentText('beforeend', `Invalid atom string '${inputMain.value}'`).show();
+      }
+      inputMain.value = this._mainAtom;
+    });
+    p.appendChild(inputMain);
+
+    // TIME
+    let timeSpan = document.createElement('span');
+    p = document.createElement('p');
     this._simulationTime = timeSpan;
     timeSpan.innerText = '- s';
     p.insertAdjacentText('beforeend', 'Time Elapsed: ');
@@ -663,6 +724,10 @@ export default class SampleManager {
       else string = 'Unknown';
     } else if (legend === LegendOptionValues.Decayed) string = atom.hasDecayed() ? 'Decayed' : 'Not Decayed';
     else if (legend === LegendOptionValues.DecayedTimes) string = (atom.getHistory().length - 1).toString();
+    else if (legend === LegendOptionValues.Main) {
+      const atomString = this._mainAtomType === 'element' ? atom.get<string>('name') : atom.get<string>('isotopeSymbol');
+      string = atomString === this._mainAtom ? "Main" : "Other";
+    }
     else throw new Error(`Unknown legend option ${legend}`);
     return string;
   }

@@ -45,26 +45,15 @@ async function main() {
   manager.setSample(sample);
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
   manager.sampleConfig.legend = LegendOptionValues.Radioactive;
-  manager.sampleConfig.manualOverride = true;
+  // manager.sampleConfig.manualOverride = true;
   manager.sampleConfig.bindSpacebar = true;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();
 
-  let atom = new Atom("U-236m17");
+  let atom = new Atom("U-238");
   manager.addAtomToSample(atom);
   globals.atom = atom;
-
-  // for (let i = 0; i < 100; i++) {
-  //   let element = randomChoice(elementData.order);
-  //   let isotope = randomChoice(Object.keys(elementData[element].isotopes));
-  //   if (isotope == undefined) {
-  //     i--;
-  //   } else {
-  //     let atom = Atom.fromIsotopeString(isotope);
-  //     manager.addAtomToSample(atom);
-  //   }
-  // }
 }
 
 main();

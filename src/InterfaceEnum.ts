@@ -46,6 +46,7 @@ export enum LegendOptionValues {
     Radioactive, // Radioactive : Stable
     Decayed, // Decayed or not?
     DecayedTimes, // How many times have these decayed?
+    Main, // Highlight "main"
 }
 
 /** An item in the legend */
@@ -154,3 +155,5 @@ export const DecayModeDescription = {
 export enum EnumDecayMode {
     Alpha, BetaMinus, BetaPlus, NeutronEmission, SpontaneousFission, ElectronCapture, NuclearIsomer, ClusterDecay
 }
+
+export type AtomType = "element" | "isotope";

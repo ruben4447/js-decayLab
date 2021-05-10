@@ -409,6 +409,13 @@ export function clickLegendLink(legend: LegendOptionValues, string: string) {
       info = generateIsotopeInfoList(title, atoms);
       break;
     }
+    case LegendOptionValues.Main: {
+      let text = `Any atom which ` + (string == 'Main' ? `does` : `does not`) + ` identify as ${globals.manager.getMainAtom().value}`;
+      new Popup(`Category: ${string}`)
+        .insertAdjacentText('beforeend', text)
+        .show();
+      break;
+    }
     default:
       console.log(`click legend link '${legend}' string '${string}' -- no action`);
   }
@@ -569,8 +576,9 @@ export function generateForceDecayInterface(callback: ForceDecayCallback): IGene
   return { title: "Force Decay", body };
 }
 
-export function generateInsertPopup(custom: boolean, callback: (string: string) => void): IGeneratedInfo {
+export function generateInsertPopup(custom: boolean, callback: (string: string, count: number) => void): IGeneratedInfo {
   const body = document.createElement("div");
+  let p: HTMLParagraphElement;
   body.classList.add('insert-isotope');
 
   const populateSelectIsotope = () => {
@@ -587,12 +595,22 @@ export function generateInsertPopup(custom: boolean, callback: (string: string) 
     }
   }
 
+  /** Option to insert multiple isotopes */
+  p = document.createElement('p');
+  body.appendChild(p);
+  p.insertAdjacentHTML('beforeend', `<abbr title='How many of the specified isotope to insert?'>Insert Count</abbr>: &nbsp;`);
+  let inputInsertCount = document.createElement("input");
+  inputInsertCount.type = "number";
+  inputInsertCount.min = '1';
+  inputInsertCount.value = '1';
+  p.appendChild(inputInsertCount);
+
   /**
    * Default insert:
    * 1) Select element
    * 2) Select isotope
    */
-  let p = document.createElement("p");
+  p = document.createElement("p");
   body.appendChild(p);
   p.insertAdjacentText('beforeend', 'Insert isotope ');
   let selectIsotope = document.createElement("select");
@@ -606,11 +624,12 @@ export function generateInsertPopup(custom: boolean, callback: (string: string) 
   selectElement.addEventListener('change', () => populateSelectIsotope());
   p.insertAdjacentElement('beforeend', selectElement);
 
+
   let btnDefaultInsert = document.createElement('button');
   btnDefaultInsert.innerText = 'Insert Isotope';
   btnDefaultInsert.addEventListener('click', () => {
     if (selectIsotope.value.length !== 0) {
-      callback(selectIsotope.value);
+      callback(selectIsotope.value, parseInt(inputInsertCount.value));
     }
   });
   body.appendChild(btnDefaultInsert);
@@ -622,7 +641,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string) 
      * Option 2 - type in isotope
     */
     body.insertAdjacentHTML('beforeend', '<br><hr>');
-    let p = document.createElement('p');
+    p = document.createElement('p');
     body.appendChild(p);
 
     p.insertAdjacentText('beforeend', 'Isotope with ')
@@ -647,7 +666,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string) 
         new Popup("Invalid Isotope").insertAdjacentText('beforeend', `Protons must be >= ${inputProtons.min}. Neutrons must be >= ${inputNeutrons.min}`).show();
       } else {
         let info = getAtomInfo(+(inputProtons.value), +(inputNeutrons.value));
-        callback(info.isotopeSymbol);
+        callback(info.isotopeSymbol, parseInt(inputInsertCount.value));
       }
     });
     body.appendChild(btnPNInsert);
@@ -664,7 +683,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string) 
     btnInsertIsotope.innerText = "Insert Isotope";
     btnInsertIsotope.addEventListener('click', () => {
       if (inputIsotope.value.length !== 0) {
-        callback(inputIsotope.value);
+        callback(inputIsotope.value, parseInt(inputInsertCount.value));
       }
     });
     body.appendChild(btnInsertIsotope);
