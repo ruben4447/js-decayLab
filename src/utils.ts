@@ -349,15 +349,37 @@ export function analyseString(str: string): IAnalysisResult | null {
   }
 
   if (obj.name) {
+    // Does the element exist?
     const elData = elementData[obj.name.toLowerCase()];
     if (elData) {
+      // Does the isotpe exist?
       const isoData = elData.isotopes[obj.isotopeSymbol];
       if (isoData) {
         obj.exists = true;
         obj.halflife = isoData.halflife;
         obj.isStable = isoData.is_stable;
       } else {
-        obj.exists = false;
+        // If metastable, does ...m1 exist?
+        if (!isNaN(obj.metastableIsotopeNumber)) {
+          const m1Data = elData.isotopes[obj.metastableIsotopeParent + 'm1'];
+          if (m1Data) {
+            let possibleMs = [];
+            for (let i = 1;;i++) {
+              let data = elData.isotopes[obj.metastableIsotopeParent + "m" + i];
+              if (data == undefined) break;
+              possibleMs.push(i);
+            }
+            const m = possibleMs[randomInt(0, possibleMs.length)];
+            obj.isotopeSymbol = obj.metastableIsotopeParent + "m" + m;
+            const mData = elData.isotopes[obj.isotopeSymbol];
+            obj.exists = true;
+            obj.halflife = mData.halflife;
+            obj.isStable = mData.is_stable;
+            obj.metastableIsotopeNumber = m;
+          } else {
+            obj.exists = false;
+          } 
+        }
       }
     } else {
       obj.exists = false;
@@ -485,5 +507,51 @@ export function isInsideSector(point: number[], center: number[], radius: number
   } else {
     const half = (angle1 + angle2) / 2;
     return isInsideSector(point, center, radius, angle1, angle2 - half) || isInsideSector(point, center, radius, angle1 + half, angle2);
+  }
+}
+
+/** Return a random isotope string.
+ * The argument may be empty, in which case a random isotope of a random element is returned, or may contain an element, in which case a random isotope of this element is returned.
+*/
+export function getRandomIsotopeString(arg: string = ''): string | null {
+  arg = arg.toLowerCase();
+  let element: string;
+  if (elementData.order.indexOf(arg) !== -1) { 
+    element = arg;
+  } else if (arg === '') {
+    // Random element.
+    element = elementData.order[randomInt(0, elementData.order.length)];
+  } else {
+    return null;
+  }
+
+  const isotopes = Object.keys(elementData[element].isotopes);
+  if (isotopes.length === 0) {
+    // If element was randomly generated and no isotopes found, try again.
+    return arg === element ? null : getRandomIsotopeString();
+  } else {
+    return isotopes[randomInt(0, isotopes.length)];
+  }
+}
+
+/** Get a suitable Spontaneous Fission nucleus for provided information. Return isotope string (or NULL) */
+export function getSuitableSFEmission(atom: IAnalysisResult, maxProtonLoss?: number): string | null {
+  if (atom.exists) {
+    if (maxProtonLoss === undefined) maxProtonLoss = atom.protons / 10;
+
+    const candidates: string[] = []; // Suitable isotope strings
+    const minProtons = atom.protons - maxProtonLoss;
+    for (let protons = atom.protons - 1; protons >= minProtons; protons--) {
+      const element: string = elementData.order[protons - 1];
+      for (const isotope in elementData[element].isotopes) {
+        if (elementData[element].isotopes.hasOwnProperty(isotope)) {
+          candidates.push(isotope);
+        }
+      }
+    }
+    
+    return candidates[randomInt(0, candidates.length)];
+  } else {
+    return null;
   }
 }

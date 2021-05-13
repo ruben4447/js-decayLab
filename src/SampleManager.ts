@@ -1,5 +1,5 @@
 import type Sample from './Sample';
-import { analyseString, bestColour, createLink, elSetDisabled, extractCoords, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
+import { analyseString, bestColour, createLink, elSetDisabled, extractCoords, getRandomIsotopeString, numberWithCommas, RADIOACTIVE_SYMBOL, randomHSBColour, randomInt, round, secondsToAppropriateTime, sortObjectByProperty, _timeUnits, _timeUnitStrings } from './utils';
 import Atom from './Atom';
 import { clickLegendLink, generateAtomInfo, generateDecayHistory, generateEditProtonNeutronCount, generateElementInfo, generateForceDecayInterface, generateFullLegend, generateInsertPopup, generatePeriodicTable } from './generate-info';
 import Popup from './Popup';
@@ -177,7 +177,7 @@ export default class SampleManager {
     const self = this;
     this._sample.forEachAtom(atom => {
       if (!atom.get<boolean>('exists')) {
-        self._sample.removeAtom(atom);
+        self._sample.removeAtom(atom, "atom does not exist");
       }
     });
   }
@@ -258,7 +258,7 @@ export default class SampleManager {
                 let symbol = _atomOver.getIsotopeSymbol();
                 let link = createLink(`Remove isotope ${symbol} from sample`);
                 link.addEventListener('click', () => {
-                  this._sample.removeAtom(_atomOver);
+                  this._sample.removeAtom(_atomOver, "removed by user");
                   setAtomOver(null);
                   popup.hide();
                 });
@@ -351,6 +351,15 @@ export default class SampleManager {
     });
     body.appendChild(checkboxInteractive);
 
+    body.insertAdjacentHTML('beforeend', '<br><abbr title="Render decay animations (slows down performance)">Decay Animations</abbr>: ');
+    let checkboxRenderDecayAnimations = document.createElement('input');
+    checkboxRenderDecayAnimations.type = 'checkbox';
+    checkboxRenderDecayAnimations.checked = this.sampleConfig.decayAnimations;
+    checkboxRenderDecayAnimations.addEventListener('change', () => {
+      this.sampleConfig.decayAnimations = checkboxRenderDecayAnimations.checked;
+    });
+    body.appendChild(checkboxRenderDecayAnimations);
+
     body.insertAdjacentHTML('beforeend', '<br><abbr title="Pressing spacebar starts/stops the simulation">Bind Spacebar</abbr>: ');
     let checkboxBindSpacebar = document.createElement('input');
     checkboxBindSpacebar.type = 'checkbox';
@@ -428,6 +437,15 @@ export default class SampleManager {
     })
     body.appendChild(inputAtomRadius);
 
+    body.insertAdjacentHTML('beforeend', '<br><abbr title="Remove atoms in simulation which are unable to decay (not including stable isotopes)">Remove Cannot Decay</abbr>: ');
+    let checkboxRemoveAtomsWhichCannotDecay = document.createElement("input");
+    checkboxRemoveAtomsWhichCannotDecay.type = "checkbox";
+    checkboxRemoveAtomsWhichCannotDecay.checked = this.sampleConfig.removeIsotopesWhichCannotDecay;
+    checkboxRemoveAtomsWhichCannotDecay.addEventListener('change', () => {
+      this.sampleConfig.removeIsotopesWhichCannotDecay = checkboxRemoveAtomsWhichCannotDecay.checked;
+    })
+    body.appendChild(checkboxRemoveAtomsWhichCannotDecay);
+
     /// Legend
     body.insertAdjacentHTML('beforeend', '<hr> <span class="heading">Legend</span><br>');
     const legendOptions = Object.keys(LegendOptionValues).filter(x => isNaN(parseInt(x))); // Get only string members of enum
@@ -491,6 +509,41 @@ export default class SampleManager {
     body.appendChild(checkboxManualOverride);
   }
 
+  /** Insert <count> atoms into sample. Return if it was succesful or not. */
+  insertAtom(string: string, count: number = 1) {
+    let success = true;
+    for (let i = 0; i < count; i++) {
+      const atom = new Atom(string);
+      let added = globals.manager.addAtomToSample(atom);
+      if (!added) {
+        success = false;
+        break;
+      }
+    }
+    return success;
+  }
+
+  /** Generate a <count> random isotopes from the prompt <string> (blank: 100% random; string: random iotope for this element)
+   * Return: NULL (if OK) or string (where the error occured)
+  */
+  insertRandomAtom(string: string, count: number = 1) {
+    for (let i = 0; i < count; i++) {
+      // Generate random isotope from given string
+      let isotopeString = getRandomIsotopeString(string);
+      if (isotopeString == null) {
+        return string;
+      }
+
+      // Add atom to Sample
+      const atom = new Atom(isotopeString);
+      let added = globals.manager.addAtomToSample(atom);
+      if (!added) {
+        return isotopeString;
+      }
+    }
+    return null;
+  }
+
   deployHTML(container: HTMLElement, legendContainer: HTMLElement) {
     let p: HTMLParagraphElement;
     this._legendContainer = legendContainer;
@@ -503,17 +556,21 @@ export default class SampleManager {
     btnInsert.addEventListener('click', () => {
       const fail = (string: string) => new Popup("Unable to Insert Isotope").insertAdjacentText('beforeend', `Unable to add '${string}' to sample. Make sure that the simulation is not running.`).show();
 
-      const { title, body } = generateInsertPopup(this.sampleConfig.manualOverride, (string, count) => {
+      const { title, body } = generateInsertPopup(this.sampleConfig.manualOverride, (string, count, isRandom) => {
         if (isNaN(count) || count < 1) return new Popup("Invalid Number").insertAdjacentText('beforeend', `Invalid isotope count '${count}'; must be an integer greater than 0`).show();
+        
         try {
-          for (let i = 0; i < count; i++) {
-            const atom = new Atom(string);
-            let added = globals.manager.addAtomToSample(atom);
-            if (added) {
-              popupInsert.hide();
-            } else {
-              fail(string);
-            }
+          let errorString: string;
+          if (isRandom) {
+            errorString = this.insertRandomAtom(string, count);
+          } else {
+            let ok = this.insertAtom(string, count);
+            if (!ok) errorString = string;
+          }
+          if (typeof errorString === 'string') {
+            fail(errorString);
+          } else {
+            popupInsert.hide();
           }
         } catch (err) {
           console.error(err);
@@ -589,7 +646,7 @@ export default class SampleManager {
     timeInput.value = this._sample.getIncTimeAmount().toString();
     timeInput.min = "0";
     timeInput.addEventListener('change', () => {
-      let value = parseInt(timeInput.value);
+      let value = Math.floor(+timeInput.value);
       if (value <= 0) {
         timeInput.value = this._sample.getIncTimeAmount().toString();
         new Popup("Invalid Input").insertAdjacentText("beforeend", `Invalid time: ${value}`).show();

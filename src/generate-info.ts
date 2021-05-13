@@ -576,13 +576,14 @@ export function generateForceDecayInterface(callback: ForceDecayCallback): IGene
   return { title: "Force Decay", body };
 }
 
-export function generateInsertPopup(custom: boolean, callback: (string: string, count: number) => void): IGeneratedInfo {
+export function generateInsertPopup(custom: boolean, callback: (string: string, count: number, random: boolean) => void): IGeneratedInfo {
   const body = document.createElement("div");
   let p: HTMLParagraphElement;
   body.classList.add('insert-isotope');
 
   const populateSelectIsotope = () => {
     const element = selectElement.value, obj = elementData[element];
+    inputPartialRandomIsotope.innerText = 'Random of ' + capitaliseString(element);
     while (selectIsotope.children.length !== 0) selectIsotope.removeChild(selectIsotope.children[0]);
     if (obj) {
       for (let isotope in obj.isotopes) {
@@ -604,6 +605,25 @@ export function generateInsertPopup(custom: boolean, callback: (string: string, 
   inputInsertCount.min = '1';
   inputInsertCount.value = '1';
   p.appendChild(inputInsertCount);
+
+  p = document.createElement('p');
+  body.appendChild(p);
+  p.insertAdjacentHTML('beforeend', 'Insert random: ');
+  let inputRandomIsotope = document.createElement("button");
+  p.appendChild(inputRandomIsotope);
+  inputRandomIsotope.innerText = 'Random';
+  inputRandomIsotope.title = "Insert completely random isotope";
+  inputRandomIsotope.addEventListener('click', () => {
+    callback('', parseInt(inputInsertCount.value), true);
+  });
+  let inputPartialRandomIsotope = document.createElement("button");
+  p.appendChild(inputPartialRandomIsotope);
+  inputPartialRandomIsotope.innerText = 'Random of Element';
+  inputPartialRandomIsotope.title = "Insert random isotope of selected element (below)";
+  inputPartialRandomIsotope.addEventListener('click', () => {
+    callback(selectElement.value, parseInt(inputInsertCount.value), true);
+  });
+  body.insertAdjacentHTML('beforeend', '<hr>');
 
   /**
    * Default insert:
@@ -629,7 +649,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string, 
   btnDefaultInsert.innerText = 'Insert Isotope';
   btnDefaultInsert.addEventListener('click', () => {
     if (selectIsotope.value.length !== 0) {
-      callback(selectIsotope.value, parseInt(inputInsertCount.value));
+      callback(selectIsotope.value, parseInt(inputInsertCount.value), false);
     }
   });
   body.appendChild(btnDefaultInsert);
@@ -666,7 +686,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string, 
         new Popup("Invalid Isotope").insertAdjacentText('beforeend', `Protons must be >= ${inputProtons.min}. Neutrons must be >= ${inputNeutrons.min}`).show();
       } else {
         let info = getAtomInfo(+(inputProtons.value), +(inputNeutrons.value));
-        callback(info.isotopeSymbol, parseInt(inputInsertCount.value));
+        callback(info.isotopeSymbol, parseInt(inputInsertCount.value), false);
       }
     });
     body.appendChild(btnPNInsert);
@@ -683,7 +703,7 @@ export function generateInsertPopup(custom: boolean, callback: (string: string, 
     btnInsertIsotope.innerText = "Insert Isotope";
     btnInsertIsotope.addEventListener('click', () => {
       if (inputIsotope.value.length !== 0) {
-        callback(inputIsotope.value, parseInt(inputInsertCount.value));
+        callback(inputIsotope.value, parseInt(inputInsertCount.value), false);
       }
     });
     body.appendChild(btnInsertIsotope);

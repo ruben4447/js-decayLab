@@ -62,11 +62,13 @@ export interface ISampleConfig {
     prettyStyle: boolean; // Show atoms with text, varying size from mass?
     atomRadius: number; // If !prettyStyle, what is the radius of each atom?
     interactive: boolean; // Is the canvas interactive?
+    decayAnimations: boolean; // Render decay animations?
     renderMode: RenderMode;
     legend: LegendOptionValues; // Legend to display
     legendLength: number; // Number of items in legend
     manualOverride: boolean; // Allow e.g. force decay and stuff
     bindSpacebar: boolean; // Bind spacebar to start/stop the simulation?
+    removeIsotopesWhichCannotDecay: boolean; // Remove isotopes which have no decay information
 }
 
 /** Function that creates a default version of ISampleConfig */
@@ -75,11 +77,13 @@ export function createSampleConfigObject(): ISampleConfig {
         prettyStyle: true,
         atomRadius: 20,
         interactive: true,
+        decayAnimations: true,
         renderMode: RenderMode.Atoms,
         legend: LegendOptionValues.None,
         legendLength: 7,
         manualOverride: false,
         bindSpacebar: false,
+        removeIsotopesWhichCannotDecay: true,
     };
 }
 
@@ -146,7 +150,7 @@ export const DecayModeDescription = {
     BetaMinus: 'Eject an electron and an antineutrino - turn neutron to proton',
     BetaPlus: 'Eject a positron and a neutrino - turn proton to neutron',
     NeutronEmission: 'Eject 1 or more neutrons',
-    // SpontaneousFission: '',
+    SpontaneousFission: 'Spontaneous breakdown into small nuclei',
     ElectronCapture: 'Nucleus captures an orbiting electron, converting a proton into a neutron',
     // NuclearIsomer: '',
     ClusterDecay: 'Emits small cluster of nucleons',

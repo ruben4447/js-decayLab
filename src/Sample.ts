@@ -1,11 +1,12 @@
 import Atom from './Atom';
-import { arrayRemove, probability, getNeutronsProtonsFromIsotopeString } from './utils';
+import { arrayRemove, probability } from './utils';
 import SampleManager from './SampleManager';
 import DecayAnimation from './DecayAnimation';
-import { EnumDecayMode, IAttemptedDecayInfo } from './InterfaceEnum';
+import { EnumDecayMode, IAttemptedDecayInfo, IDecayInfo } from './InterfaceEnum';
+import globals from './globals';
 
 type AtomDecayCallback = (atom: Atom, info: IAttemptedDecayInfo, time: number) => void;
-type AtomRemoveCallback = (atom: Atom) => void;
+type AtomRemoveCallback = (atom: Atom, text: string) => void;
 
 export class Sample {
   private _animations: DecayAnimation[] = [];
@@ -16,8 +17,6 @@ export class Sample {
 
   private _callbackAtomDecay: AtomDecayCallback;
   private _callbackAtomRemove: AtomRemoveCallback;
-
-  constructor() { }
 
   forEachAtom(fn: (value: Atom, index: number, array: Atom[]) => void) {
     this._atoms.forEach(fn);
@@ -61,9 +60,9 @@ export class Sample {
     return this;
   }
 
-  removeAtom(atom: Atom) {
+  removeAtom(atom: Atom, reason?: string) {
     const success = arrayRemove(this._atoms, atom);
-    if (success && typeof this._callbackAtomRemove) this._callbackAtomRemove(atom);
+    if (success && typeof this._callbackAtomRemove) this._callbackAtomRemove(atom, reason);
     return success;
   }
 
@@ -81,14 +80,15 @@ export class Sample {
   atomDecay(atom: Atom, force: boolean = false): boolean {
     if (force || probability(atom.decayChancePerSecond() * this._incTimeAmount)) {
       if (atom.get<boolean>('isStable') === false) {
-        let info = atom.decay();
+        const info = atom.decay();
         if (info) {
-          if (info.success) this._animations.push(new DecayAnimation(atom, info)); // Push decay animation
           if (typeof this._callbackAtomDecay === 'function') this._callbackAtomDecay(atom, info, this._time);
           return info.success;
         } else {
           return false;
         }
+      } else {
+        return false;
       }
     }
     return false;
@@ -98,7 +98,6 @@ export class Sample {
   forcedAtomDecay(atom: Atom, mode: EnumDecayMode, neutrons?: number, protons?: number): boolean {
     let info = atom.forceDecay(mode, neutrons, protons);
     if (info) {
-      if (info.success) this._animations.push(new DecayAnimation(atom, info)); // Push decay animation
       if (typeof this._callbackAtomDecay === 'function') this._callbackAtomDecay(atom, info, this._time);
       return info.success;
     } else {
@@ -125,6 +124,13 @@ export class Sample {
     let atoms = [...this._atoms]; // Atoms to evaluate
     for (let i = 0, atom: Atom; i < atoms.length; i++) {
       atom = atoms[i];
+
+      // If atom is radioactive and cannot decay
+      if (globals.manager.sampleConfig.removeIsotopesWhichCannotDecay && atom.get<boolean>("isStable") !== true && !atom.canDecay()) {
+        this.removeAtom(atom, "no decay isotopes could be found");
+        continue;
+      }  
+
       let decayed = this.atomDecay(atom, false);
       if (decayed) {
         atoms.push(atom); // Re-evaluate daughter isotope
@@ -150,6 +156,12 @@ export class Sample {
         atom.resetHistory();
       }
     });
+  }
+
+  addAnimation(atom: Atom, info: IDecayInfo): DecayAnimation {
+    let animation = new DecayAnimation(atom, info);
+    this._animations.push(animation); // Push decay animation
+    return animation;
   }
 }
 

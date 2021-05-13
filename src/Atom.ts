@@ -1,7 +1,7 @@
 import elementData from '../data/elements.json';
 import categoryColours from '../data/categories.json';
 import SampleManager from './SampleManager';
-import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, probability, analyseString, getAtomInfo, decaySymbolToEnumValue } from './utils';
+import { rgbStringify, TWO_PI, randomChoice, getSuitableFontSize, probability, analyseString, getAtomInfo, decaySymbolToEnumValue, getSuitableSFEmission } from './utils';
 import { EnumDecayMode, IAnalysisResult, IAttemptedDecayInfo, IDecayInfo, LegendOptionValues } from './InterfaceEnum';
 
 const HIGHLIGHT_COLOUR = rgbStringify([255, 50, 250]);
@@ -135,6 +135,17 @@ export default class Atom {
   /** Get isotope symbol */
   getIsotopeSymbol() { return this._data.isotopeSymbol; }
 
+  /** Can atom decay? */
+  canDecay(): boolean {
+    if (!this._data.exists || this._data.isStable === true || isNaN(this.decayChancePerSecond())) return false;
+    for (let decayInfo of elementData[this._data.name.toLowerCase()].isotopes[this._data.isotopeSymbol].decay as IDecayInfo[]) {
+      if ((decayInfo.daughter == undefined || decayInfo.daughter == '') && (decayInfo.mode == undefined || decayInfo.mode as any == '')) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * Decay isotope (modify data of this)
    * - return [IAttemptedDecayInfo] - decayed? (check success property)
@@ -164,8 +175,32 @@ export default class Atom {
       }
     }
 
-    // Decay into random unknown
-    if (percent_unknown.length !== 0) decayInfo = { ...randomChoice(percent_unknown) };
+    // Decay into random unknown if not have one already
+    if (decayInfo == null && percent_unknown.length !== 0) decayInfo = { ...randomChoice(percent_unknown) };
+
+    // If not decayed, but there is still some isotope left, choose one with the greatest percentage chance
+    if (decayInfo == null && percent_known.length > 0) {
+      let preferredOption = percent_known[0];
+      for (let i = 0; i < percent_known.length; i++) {
+        if (percent_known[i].percentage > preferredOption.percentage) preferredOption = percent_known[i];
+      }
+      decayInfo = { ...preferredOption };
+    }
+
+    // If *STILL* not decayed and decay mode == 'SF'...
+    if (decayInfo == null && this._data.name) {
+      let hasSF = false;
+      for (let decayOption of elementData[this._data.name.toLowerCase()].isotopes[this._data.isotopeSymbol].decay) {
+        if (decayOption.mode === 'SF') {
+          hasSF = true;
+          break;
+        }
+      }
+      if (hasSF) {
+        let daughter = getSuitableSFEmission(this._data);
+        decayInfo = { daughter, mode: EnumDecayMode.SpontaneousFission };
+      }
+    }
 
     if (decayInfo && decayInfo.daughter == undefined) decayInfo = null;
 
@@ -180,12 +215,13 @@ export default class Atom {
       }
     } else {
       obj.success = false;
+      obj.error = new Error(`No daughter isotope could be found`);
     }
 
     // If sucessful...
     if (obj.success) {
       // obj.mode: turn string symbol to EnumDecayMode
-      obj.mode = decaySymbolToEnumValue(obj.mode.toString());
+      if (typeof obj.mode === 'string') obj.mode = decaySymbolToEnumValue(obj.mode);
       // Add to history
       this._history.push({ daughter: obj.daughter, mode: obj.mode });
     }
@@ -251,6 +287,17 @@ export default class Atom {
           Δn = -Math.floor(neutrons);
         }
         break;
+      case EnumDecayMode.SpontaneousFission: {
+        let daughterString = getSuitableSFEmission(this._data);
+        if (daughterString == null) {
+          error = new Error(`SpontaneousFission: unable to find suitable nucleus to emit`);
+        } else {
+          let daughter = analyseString(daughterString);
+          Δp = -(this._data.protons - daughter.protons);
+          Δn = -(this._data.neutrons - daughter.neutrons);
+        }
+        break;
+      }
       default:
         error = new TypeError(`Unknown or unsupported decay mode: "${mode}"`);
     }

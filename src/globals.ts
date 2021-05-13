@@ -16,7 +16,7 @@ export interface IGlobals {
 export const globals: IGlobals = {
   manager: undefined,
   sample: undefined,
-  ver: 0.171,
+  ver: 0.181,
   atom: undefined, // Set via '#' key when manualOverride=true
   elementData,
   utils,

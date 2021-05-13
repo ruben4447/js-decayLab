@@ -1,12 +1,12 @@
 import Sample from './Sample';
-import Atom from './Atom';
 import SampleManager from './SampleManager';
 import Popup from './Popup';
 import globals from './globals';
-import { arrFromBack, randomChoice } from './utils';
-import { DecayMode, EnumDecayMode, LegendOptionValues, RenderMode } from './InterfaceEnum';
+import { arrFromBack } from './utils';
+import { DecayMode, EnumDecayMode, LegendOptionValues } from './InterfaceEnum';
 
 var wrapper: HTMLElement;
+var log: string = '';
 
 async function main() {
   wrapper = document.getElementById('wrapper');
@@ -23,19 +23,38 @@ async function main() {
 
   document.body.insertAdjacentHTML('beforeend', `<p><em>Decay Lab version ${globals.ver}</em></p>`);
 
+  const elDecayOutput = document.getElementById('decay-output');
+
   const sample = new Sample();
   globals.sample = sample;
   sample.onAtomDecay((atom, info, time) => {
     const dmode = DecayMode[EnumDecayMode[info.mode]];
     manager.updateLegend();
+    let text: string;
     if (info.success) {
-      console.log(`%c✓ [${time} s] decay: ${arrFromBack(atom.getHistory(), 2).daughter} -> (${dmode}) -> ${atom.getIsotopeSymbol()}`, 'color:forestgreen;');
+      if (globals.manager.sampleConfig.decayAnimations) globals.sample.addAnimation(atom, info); // Push decay animation
+
+      text = `DECAY @ ${time}s [✓] : ${arrFromBack(atom.getHistory(), 2).daughter} -> (${dmode}) -> ${atom.getIsotopeSymbol()}`;
     } else {
-      console.log(`%c⨯ [${time} s] decay failed: ${atom.getIsotopeSymbol()} -> (${dmode}) -> ${info.daughter}\n%c${info.error.message}`, 'color:tomato;', 'color:yellow;background:black;');
+      const message = info.error === undefined ? '<unprovided>' : info.error.message;
+      text = `DECAY @ ${time}s [⨯] : ${atom.getIsotopeSymbol()} -> (${dmode}) -> ${info.daughter} - ${message}`;
     }
+    log += text + '\n';
+    elDecayOutput.innerText = text;
   });
-  sample.onAtomRemove(atom => {
-    console.log(`Removed atom ${atom.getIsotopeSymbol()}`);
+  sample.onAtomRemove((atom, reason) => {
+    log += `REMOVE ${atom.getIsotopeSymbol()} : "${reason}" \n`;
+  });
+  
+  const btnShowLog = document.getElementById('btn-view-log');
+  btnShowLog.addEventListener('click', () => {
+    const textarea = document.createElement('textarea');
+    textarea.rows = 25;
+    textarea.cols = 75;
+    textarea.value = log;
+    new Popup("Log")
+      .insertAdjacentElement('beforeend', textarea)
+      .show();
   });
 
   const manager = new SampleManager(wrapper);
@@ -44,16 +63,14 @@ async function main() {
   globals.manager = manager;
   manager.setSample(sample);
   manager.deployHTML(document.getElementById('controls'), document.getElementById('legend'));
-  manager.sampleConfig.legend = LegendOptionValues.Radioactive;
-  // manager.sampleConfig.manualOverride = true;
   manager.sampleConfig.bindSpacebar = true;
+  manager.sampleConfig.manualOverride = true;
+  manager.sampleConfig.legend = LegendOptionValues.Radioactive;
   manager.initOptionsPopup();
   manager.setupLegend();
   manager.start();
 
-  let atom = new Atom("U-238");
-  manager.addAtomToSample(atom);
-  globals.atom = atom;
+  manager.insertRandomAtom('', 200);
 }
 
 main();
